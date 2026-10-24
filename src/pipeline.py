@@ -79,7 +79,7 @@ def inner_backtest(wide: pd.DataFrame, target: str, tr: np.ndarray, refs: list[s
     return np.concatenate(preds), np.concatenate(truth), np.concatenate(order)
 
 
-def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days: int = 30, level: str = "90", air_density: bool = False) -> dict:
+def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days: int = 30, level: str = "90", air_density: bool = False, pc=None, extra_windows: dict | None = None) -> dict:
     """Everything the app needs for one target and one outage period."""
     from core import training_mask
     from energy import Wobble, energy_kwh, expected_power
@@ -93,7 +93,7 @@ def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days:
     pred = model.predict(te)
     ip, it, io = inner_backtest(wide, target, tr, model.refs)
     wob = Wobble().fit(ip, it, io)
-    pc = PowerCurve(target)
+    pc = pc or PowerCurve(target)
     rho = None
     if air_density:
         from density import estimate_density, wind_factor
@@ -107,7 +107,16 @@ def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days:
         power = expected_power(pc, pred, wob, "gauss_global")
     e = energy_kwh(power)
     rel = RECIPE["energy"]["range_turbine_rel"][level]
+    extra = {}
+    for name, (a, b) in (extra_windows or {}).items():
+        w_idx = np.where((idx >= a) & (idx <= b))[0]
+        if len(w_idx):
+            wp = model.predict(w_idx)
+            extra[name] = {"timestamps": idx[w_idx], "wind_pred": wp, "power_kw": expected_power(pc, wp, wob, "gauss_global"),
+                           "wind_true": y[w_idx]}
+    inner = {"wind_pred": ip, "wind_true": it}
     return {
+        "extra": extra, "inner": inner, "train_idx": tr,
         "target": target, "refs": model.refs, "timestamps": idx[te], "wind_pred": pred,
         "power_kw": power, "wobble_sd": wob.global_sd, "air_density": rho,
         "energy_kwh": e, "range_kwh": (e * (1 - rel), e * (1 + rel)), "range_level": level,

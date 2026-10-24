@@ -10,8 +10,8 @@ INTERVAL_HOURS = 10 / 60
 
 
 class PowerCurve:
-    def __init__(self, turbine: str = "T1"):
-        pc = load_power_curve(turbine)
+    def __init__(self, turbine: str = "T1", frame: pd.DataFrame | None = None):
+        pc = load_power_curve(turbine) if frame is None else frame.sort_values("wind_speed")
         self.ws = pc["wind_speed"].to_numpy(dtype=float)
         self.p = pc["power"].to_numpy(dtype=float)
         self.cut_out = self.ws[-1]
