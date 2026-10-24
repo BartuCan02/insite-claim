@@ -5,6 +5,7 @@ font = "sans serif"
 
 [server]
 headless = true
+address = "localhost"
 runOnSave = false
 
 [browser]
