@@ -1550,7 +1550,7 @@ def stage_tech():
     with st.container(key="pz_tech"):
         st.markdown("<div class='pzh'>How the wind is rebuilt — and how we found the model</div>"
                     f"<div class='flow' style='grid-template-columns:1fr 22px 1fr 22px 1fr'>{io_html}</div>"
-                    + metrics_html()
+                    + metrics_html() + ""
                     "<div class='pztech' style='margin-top:14px'>"
                     "<div class='col'><h3>How we found it: staged grid search</h3><table class='t'><thead><tr><th>Stage</th><th>Tried</th><th>Won</th></tr></thead>"
                     f"<tbody>{srows}</tbody></table><div class='pzsmall'>65,000+ trained models, each scored on 84 simulated 3-day outages. "
