@@ -291,7 +291,7 @@ def build_context():
         CTX["msg"] = ("The analysis couldn't run for this selection", f"{e}. Try a longer training window or a different outage window.")
         return
     total, lo, hi = ac.park_range(results, st.session_state.level)
-    CTX.update(ok=True, results=results, targets=targets, start=start, end=end, test_window=test_window,
+    CTX.update(ok=True, key=key, results=results, targets=targets, start=start, end=end, test_window=test_window,
                total=total, lo=lo, hi=hi, hours=(end - start).total_seconds() / 3600 + 1 / 6,
                color={r["target"]: SERIES[i % len(SERIES)] for i, r in enumerate(results)})
 
@@ -747,6 +747,12 @@ ol{{color:{TEXT2};font-size:15px;line-height:1.6;padding-left:20px}} .foot{{font
 </div></body></html>"""
 
 
+@st.cache_data(show_spinner=False, max_entries=4)
+def report_cached(key, _results, park_name, insurer, policy):
+    """Built during the page run (it needs the session's settings) and cached per input."""
+    return report_html(_results, park_name, insurer, policy)
+
+
 def page_report():
     section("Claim report", "Everything the insurer needs, ready to send.")
     if not need_results("report"):
@@ -770,7 +776,9 @@ def page_report():
         st.download_button("Download email", edited, file_name="insite_claim_email.txt", mime="text/plain", key="dl_email")
     with r2, st.container(key="card_downloads"):
         card_head("Claim report", "A one-page report with figures, charts, accuracy and method. Open it in a browser and choose Print › Save as PDF.")
-        st.download_button("Download claim report", lambda: report_html(results, park_name, insurer, policy), file_name="insite_claim_report.html",
+        with st.spinner("Preparing the report…"):
+            report = report_cached(CTX["key"], results, park_name, insurer, policy)
+        st.download_button("Download claim report", report, file_name="insite_claim_report.html",
                            mime="text/html", type="primary", key="dl_report", width="stretch")
         st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
         card_head("Data", f"{len(table):,} rows · every 10-minute step for each affected turbine.")
