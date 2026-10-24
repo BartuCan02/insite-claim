@@ -1266,7 +1266,7 @@ def pres_next():
     s_, k = st.session_state.stage, st.session_state.sub
     if k + 1 < STAGE_SUBS.get(s_, 1):
         pres_go(s_, k + 1)
-    elif s_ < 8:
+    elif s_ < 7:
         pres_go(s_ + 1)
 
 
@@ -1324,12 +1324,12 @@ def pz_nav(center=False):
     s_, k = st.session_state.stage, st.session_state.sub
     subs = STAGE_SUBS.get(s_, 1)
     dots = "".join(f"<i class='{'on' if j == k else ''}'></i>" for j in range(subs)) if subs > 1 else ""
-    prog = f"<div class='pzprog'>{s_:02d} / 08{('<span>' + dots + '</span>') if dots else ''}</div>"
+    prog = f"<div class='pzprog'>{s_:02d} / 07{('<span>' + dots + '</span>') if dots else ''}</div>"
     with st.container(key="pz_uic" if center else "pz_ui", horizontal=True, gap="small"):
         if s_ > 1 or k > 0:
             st.button("← Back", key="pz_back", type="tertiary", on_click=pres_back)
         st.markdown(prog, unsafe_allow_html=True)
-        if s_ == 8:
+        if s_ == 7:
             st.button("Restart", key="pz_restart", on_click=pres_go, args=(1,))
             st.button("Finish", key="pz_finish", type="primary", on_click=pres_exit, args=("Claim report",))
         elif s_ not in (3, 4):
@@ -1607,13 +1607,7 @@ def page_present():
         pz_caption(cap)
         page_analysis(present=True)
     else:
-        if s_ == 7:
-            contract, _, _ = contract_and_calc()
-            n = sum(1 for t in contract.terms.values() if t.clause) if contract else 0
-            target = "card_contract"
-            cap = f"Policy clauses identified · <b>{n} terms</b> matched to the claim" if contract else "Coverage review required · <b>no contract attached</b>"
-        else:
-            target, cap = "card_composer", "From missing data to <b>a defensible claim.</b>"
+        target, cap = "card_composer", "From missing data to <b>a defensible claim.</b>"
         spotlight(target)
         pz_caption(cap)
         page_report()
