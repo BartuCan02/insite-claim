@@ -573,12 +573,6 @@ def kpi_cards():
     _, calc, _ = contract_and_calc()
     cards = [("Estimated energy loss", f"{CTX['total']:,.0f}<span>kWh</span>",
               f"{lv} % range {CTX['lo']/1000:,.0f}–{CTX['hi']/1000:,.0f} MWh · {len(results)} turbines", kicon(IC_BOLT))]
-    if calc and calc.get("rate"):
-        exposure = calc["total_kwh"] * calc["rate"]
-        cards.append(("Claim estimate", f"EUR {calc['amount']:,.0f}",
-                      f"range EUR {calc['amount_lo']:,.0f} – {calc['amount_hi']:,.0f} · after the {calc['waiting_h']:g} h waiting period · subject to review", kicon(IC_COIN)))
-    else:
-        cards.append(("Claim estimate", "—", "Add the insurance contract on the Claim report page", kicon(IC_COIN)))
     tm = [r["test_metrics"] for r in results if "test_metrics" in r]
     tw = CTX["test_window"]
     if tm and tw and len(tm) == len(results):
@@ -589,9 +583,6 @@ def kpi_cards():
     else:
         mae = float(np.mean([r["inner_metrics"]["wind_mae"] for r in results]))
         cards.append(("Back-tested accuracy", f"{mae:.2f}<span>m/s</span>", "wind MAE on the training days, each piece hidden in turn", kicon(IC_SHIELD)))
-    rel = (RECIPE["energy"]["range_park_rel"] if len(results) > 1 else RECIPE["energy"]["range_turbine_rel"])[lv]
-    cards.insert(1, ("Uncertainty", f"±{100 * rel:.0f}<span>%</span>",
-                     f"{lv} % range {CTX['lo']:,.0f} – {CTX['hi']:,.0f} kWh · calibrated on 84 simulated outages", kicon(IC_CLOCK)))
     with st.container(key="kpiwrap"):
         kpis(cards)
 
@@ -1598,7 +1589,7 @@ def page_present():
     if s_ in (5, 6):
         target, cap = None, ""
         if s_ == 5:
-            target, cap = "kpiwrap", "Here’s the estimated loss <b>and its claim value.</b>"
+            target, cap = "kpiwrap", "Here’s the estimated loss <b>and how accurate it is.</b>"
         elif k == 0:
             bt = ac.band_table(res)
             tot = bt.groupby("band", observed=False).kwh.sum()
