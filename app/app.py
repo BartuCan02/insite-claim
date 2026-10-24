@@ -262,7 +262,10 @@ with tabs[2]:
     else:
         st.info("No measured data after the outage to test against.")
     st.markdown("**Back-test inside the training window**")
-    st.caption("Each 3-day piece of the training window was hidden in turn and predicted by a model that never saw it.")
+    st.caption("A rehearsal inside the training days: the training window is cut into 3-day pieces; each piece is hidden in turn, "
+               "the model is trained on the rest and predicts it. This measures how much real wind wobbles around our estimate "
+               "(used for the energy correction) and works for any upload, even without measured data after the outage. "
+               "Energy deviation here is before the energy correction (wind put straight through the power curve).")
     st.dataframe(pd.DataFrame([{"turbine": r["target"], "wind RMSE (m/s)": round(r["inner_metrics"]["wind_rmse"], 2),
                                 "wind MAE (m/s)": round(r["inner_metrics"]["wind_mae"], 2),
                                 "power RMSE (kW)": round(r["inner_metrics"]["power_rmse"]),
@@ -272,10 +275,18 @@ with tabs[2]:
     st.markdown("**Validation on 84 simulated outages (July–August)**")
     st.caption("How the method was chosen: every 3-day window in July/August was hidden and rebuilt, using only the 30 days before it.")
     st.dataframe(pd.DataFrame([
-        {"method": "Linear model, wind speed only (simple baseline)", "power RMSE (kW)": 677, "wind RMSE (m/s)": 1.19, "total energy deviation": "−13.7 %"},
-        {"method": "This tool, without energy correction", "power RMSE (kW)": 631, "wind RMSE (m/s)": 1.13, "total energy deviation": "−11.2 %"},
-        {"method": "This tool", "power RMSE (kW)": 621, "wind RMSE (m/s)": 1.13, "total energy deviation": "−2.0 %"}]),
-        hide_index=True, width="stretch")
+        {"setup": "Simple baseline", "what it does": "Linear regression (ridge) on the current wind speed of all 7 reference turbines; "
+         "wind put straight through the power curve.", "power RMSE (kW)": 677, "wind RMSE (m/s)": 1.19, "total energy deviation": "−13.7 %"},
+        {"setup": "This tool, without energy correction", "what it does": "Top-5 references picked by correlation. Inputs: their wind now, "
+         "each park's wind 10/30/60 min earlier and later, wind direction, turbulence, how much references agree. "
+         "Prediction = 60 % linear model + 40 % LightGBM (small decision trees). Wind put straight through the power curve.",
+         "power RMSE (kW)": 631, "wind RMSE (m/s)": 1.13, "total energy deviation": "−11.2 %"},
+        {"setup": "This tool", "what it does": "Same wind prediction, but the power curve is averaged over the typical wobble of real "
+         "wind around the estimate (about ±1.1 m/s), which removes the systematic under-estimate of energy.",
+         "power RMSE (kW)": 621, "wind RMSE (m/s)": 1.13, "total energy deviation": "−2.0 %"}]),
+        hide_index=True, width="stretch",
+        column_config={"what it does": st.column_config.TextColumn(width="large")})
+    st.caption("Wind RMSE is the same in the last two rows because only the step from wind to energy differs.")
 
 # ---------------- method ----------------
 with tabs[3]:
