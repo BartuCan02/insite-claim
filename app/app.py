@@ -347,7 +347,10 @@ with tabs[4]:
 # ---------------- download ----------------
 with tabs[5]:
     table = ac.results_table(results)
-    st.dataframe(table.head(200), hide_index=True, width="stretch")
+    n_per = table.groupby("turbine").size()
+    st.caption(f"{len(table):,} rows: every 10-minute step of the outage for each turbine "
+               f"({', '.join(f'{t}: {n}' for t, n in n_per.items())}). Scroll inside the table to see all of them.")
+    st.dataframe(table, hide_index=True, width="stretch", height=420)
     st.download_button("Download predicted time series (CSV)", table.to_csv(index=False), file_name="outage_predictions.csv", mime="text/csv", type="primary")
     summary = {"outage_start": str(start), "outage_end": str(end), "level_pct": level, "air_density": density,
                "total_kwh": total, "range_kwh": [lo, hi],
