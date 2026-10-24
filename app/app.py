@@ -1338,7 +1338,7 @@ def pz_nav(center=False):
         elif s_ not in (3, 4):
             st.button("Next →", key="pz_next", type="primary", on_click=pres_next)
     with st.container(key="pz_exit", horizontal=True, gap="small"):
-        st.html("<button class='pzfs' onclick=\"document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()\">Full screen</button>",
+        st.html("<button class='pzfs' type='button'>Full screen</button>",
                 unsafe_allow_javascript=True)
         st.button("Exit", key="pz_exitbtn", type="tertiary", on_click=pres_exit)
 
@@ -1370,6 +1370,10 @@ def pz_scroll(target):
 (function(){{
   if (!window.__insiteKeys) {{
     window.__insiteKeys = true;
+    const fs = () => {{ const d = document, el = d.documentElement;
+      if (d.fullscreenElement || d.webkitFullscreenElement) {{ (d.exitFullscreen || d.webkitExitFullscreen).call(d); }}
+      else {{ (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }} }};
+    document.addEventListener('click', function(e) {{ if (e.target.closest && e.target.closest('.pzfs')) {{ e.preventDefault(); fs(); }} }}, true);
     document.addEventListener('keydown', function(e) {{
       const a = document.activeElement; if (a && ['INPUT','TEXTAREA','SELECT'].includes(a.tagName)) return;
       const btns = Array.from(document.querySelectorAll('.st-key-pz_ui button, .st-key-pz_uic button, .st-key-pz_exit button, .st-key-pz_float button'));
@@ -1377,6 +1381,7 @@ def pz_scroll(target):
       if (e.key === 'ArrowRight') hit(['Next →', 'Analyze →', 'Finish']);
       else if (e.key === 'ArrowLeft') hit(['← Back']);
       else if (e.key === 'Escape') hit(['Exit']);
+      else if (e.key === 'f' || e.key === 'F') {{ fs(); e.preventDefault(); }}
     }});
   }}
   const sel = {json.dumps('.st-key-' + target) if target else 'null'};
