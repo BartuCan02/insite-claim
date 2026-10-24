@@ -657,11 +657,14 @@ def page_analysis(present=False):
         if present:
             tot_e = sum(r["energy_kwh"] for r in results)
             srt = sorted(results, key=lambda x: -x["energy_kwh"])
-            f = go.Figure(go.Bar(y=[r["target"] for r in srt], x=[100 * r["energy_kwh"] / tot_e for r in srt], orientation="h",
+            f = go.Figure(go.Bar(y=[r["target"] for r in srt], x=[r["energy_kwh"] / 1000 for r in srt], orientation="h",
                                  marker_color=[BLUE if r["target"] == top_t else HAIR for r in srt],
-                                 text=[f"{100 * r['energy_kwh'] / tot_e:.0f} %" for r in srt], textposition="outside",
-                                 hovertemplate="%{y}: %{x:.0f} % of the loss<extra></extra>"))
-            f.update_xaxes(range=[0, 60], title_text="share of the loss (%)")
+                                 error_x=dict(type="data", symmetric=False, array=[(r["range_kwh"][1] - r["energy_kwh"]) / 1000 for r in srt],
+                                              arrayminus=[(r["energy_kwh"] - r["range_kwh"][0]) / 1000 for r in srt], color=TEXT2, thickness=1.4, width=8),
+                                 text=[f"{r['energy_kwh'] / 1000:,.0f} MWh · {100 * r['energy_kwh'] / tot_e:.0f} %" for r in srt],
+                                 textposition="inside", insidetextanchor="start", textfont=dict(color="#fff"),
+                                 hovertemplate="%{y}: %{x:,.1f} MWh<extra></extra>"))
+            f.update_xaxes(range=[0, max(r["range_kwh"][1] for r in srt) / 1000 * 1.08], title_text="lost energy (MWh) · whiskers: 90 % range")
             f.update_yaxes(autorange="reversed", showgrid=False)
         else:
             f.update_yaxes(title_text="MWh")
