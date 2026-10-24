@@ -18,6 +18,7 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 import app_core as ac  # noqa: E402
+import claim as cl  # noqa: E402
 from core import park_of  # noqa: E402
 from pipeline import RECIPE  # noqa: E402
 
@@ -204,7 +205,8 @@ def segmented(label, options, key, default=None, fmt=None):
 
 # ------------------------------------------------------------------ persistent settings (survive page switches)
 DEFAULTS = {"source": "Example dataset", "window_days": RECIPE["training_window_days"], "level": "90", "density": False,
-            "min_gap_h": 6.0, "outage": None, "targets": None, "fp": None, "uploads_w": (), "uploads_c": (), "park": None}
+            "min_gap_h": 6.0, "outage": None, "targets": None, "fp": None, "uploads_w": (), "uploads_c": (), "park": None,
+            "contract_src": "Sample contract", "contract_up": None}
 for k, v in DEFAULTS.items():
     st.session_state.setdefault(k, v)
 
@@ -681,7 +683,7 @@ def page_method():
         st.caption(f"Air density during the outage, estimated from the reference parks: {np.mean(r['air_density']):.3f} kg/m³ (standard air 1.225).")
 
 
-def report_html(results, park_name, insurer, policy):
+def report_html(results, park_name, insurer, policy, contract_html=""):
     """Self-contained claim report. Opens in any browser; print to PDF from there."""
     lv = st.session_state.level
     start, end = CTX["start"], CTX["end"]
@@ -736,6 +738,7 @@ ol{{color:{TEXT2};font-size:15px;line-height:1.6;padding-left:20px}} .foot{{font
 <h2>Per turbine</h2><table><tr><th>Turbine</th><th class="n">Mean rebuilt wind</th><th class="n">Lost energy (kWh)</th><th class="n">{lv} % range (kWh)</th><th>Reference turbines</th></tr>{rows}</table>
 <h2>Rebuilt wind during the outage</h2>{c1}
 <h2>Lost energy</h2>{c2}
+{contract_html}
 {acc}
 <h2>Method</h2><ol>
 <li>Reference turbines in neighbouring parks were selected automatically by correlation over the {int(st.session_state.window_days)} days before the outage.</li>
@@ -748,9 +751,96 @@ ol{{color:{TEXT2};font-size:15px;line-height:1.6;padding-left:20px}} .foot{{font
 
 
 @st.cache_data(show_spinner=False, max_entries=4)
-def report_cached(key, _results, park_name, insurer, policy):
+def report_cached(key, _results, park_name, insurer, policy, contract_html):
     """Built during the page run (it needs the session's settings) and cached per input."""
-    return report_html(_results, park_name, insurer, policy)
+    return report_html(_results, park_name, insurer, policy, contract_html)
+
+
+SAMPLE_CONTRACT = ROOT / "data" / "sample_contract" / "sample_bi_policy_wind_park_T.pdf"
+
+
+@st.cache_data(show_spinner=False)
+def parse_contract_cached(name, data):
+    return cl.parse_contract(name, data)
+
+
+def keep_contract():
+    f = st.session_state.get("_contract_up")
+    st.session_state.contract_up = (f.name, f.getvalue()) if f is not None else None
+
+
+def term_value(t):
+    if t.value is None:
+        return "Not found"
+    if t.key == "waiting_h":
+        return f"{t.value:g} hours"
+    if t.key == "rate_eur_kwh":
+        return f"EUR {t.value:.4f} per kWh"
+    if t.key == "cap_eur":
+        return f"EUR {t.value:,.0f}"
+    if t.key in ("notice_days", "payment_days"):
+        return f"{t.value:.0f} days"
+    return "Found"
+
+
+def contract_card():
+    """Contract upload, the clauses found in it, and the claim amount they imply. Returns (contract, calc, no_exclusion, fp)."""
+    with st.container(key="card_contract"):
+        card_head("Insurance contract", "The email and report cite your policy's clauses, so the claim rests on what was agreed.")
+        src = segmented("Contract", ["Sample contract", "Upload contract", "No contract"], "_contract_src", default=st.session_state.contract_src)
+        if src != st.session_state.contract_src:
+            st.session_state.contract_src = src
+            st.rerun()
+        name = data = None
+        if src == "Sample contract" and SAMPLE_CONTRACT.exists():
+            name, data = SAMPLE_CONTRACT.name, SAMPLE_CONTRACT.read_bytes()
+            st.caption("A sample business interruption policy for wind park T, with fictional parties.")
+            st.download_button("View sample contract (PDF)", data, file_name=SAMPLE_CONTRACT.name, mime="application/pdf", key="dl_sample_contract")
+        elif src == "Upload contract":
+            st.file_uploader("Contract", type=["pdf", "docx", "txt", "md"], key="_contract_up", on_change=keep_contract,
+                             label_visibility="collapsed", help="PDF, Word or text. Clauses should be numbered, for example 4.1.")
+            if st.session_state.contract_up:
+                name, data = st.session_state.contract_up
+        if not data:
+            if src == "No contract":
+                st.caption("The email and report will not cite any contract clauses.")
+            return None, None, False, ""
+        try:
+            contract = parse_contract_cached(name, data)
+        except Exception as e:  # noqa: BLE001
+            st.markdown(f"{badge('Could not read the contract', 'orange')} <span style='color:{TEXT2};font-size:13px'>{esc(e)}</span>", unsafe_allow_html=True)
+            return None, None, False, ""
+        fp = hashlib.md5(data).hexdigest()[:10]
+        pre = contract.preamble
+        st.markdown(f"<div style='margin:10px 0 6px'>{badge('Contract read', 'green')} &nbsp;<span style='color:{TEXT2};font-size:13px'>"
+                    f"{esc(pre.get('policy', 'policy number not found'))} · {esc(pre.get('insurer', 'insurer not found'))} · "
+                    f"{len(contract.clauses)} clauses</span></div>", unsafe_allow_html=True)
+        rows = [{"Term": t.label, "Value": term_value(t), "Clause": t.clause or "—",
+                 "Contract text": (t.quote[:150] + "…") if len(t.quote) > 150 else (t.quote or "—")} for t in contract.terms.values()]
+        st.markdown(table_html(pd.DataFrame(rows), numeric=set()), unsafe_allow_html=True)
+        T = contract.terms
+        with st.expander("Adjust contract terms"):
+            a1, a2, a3, a4 = st.columns(4)
+            ov = {"rate_eur_kwh": a1.number_input("Rate (EUR per kWh)", 0.0, 10.0, float(T["rate_eur_kwh"].value or 0.0), 0.001, format="%.4f", key=f"ov_rate_{fp}"),
+                  "waiting_h": a2.number_input("Waiting period (h)", 0.0, 240.0, float(T["waiting_h"].value or 0.0), 1.0, key=f"ov_wait_{fp}"),
+                  "cap_eur": a3.number_input("Limit per event (EUR)", 0.0, 1e9, float(T["cap_eur"].value or 0.0), 1000.0, key=f"ov_cap_{fp}"),
+                  "notice_days": a4.number_input("Notify within (days)", 0.0, 365.0, float(T["notice_days"].value or 0.0), 1.0, key=f"ov_notice_{fp}")}
+            ov = {k: (v if v > 0 else None) for k, v in ov.items()}
+        no_excl = st.checkbox("Confirm: no planned maintenance and no curtailment ordered by the grid operator during the outage"
+                              + (f" (clause {T['exclusions'].clause})" if T["exclusions"].clause else ""), key=f"noexcl_{fp}")
+        rel = RECIPE["energy"]["range_park_rel"][st.session_state.level] if len(CTX["results"]) > 1 else RECIPE["energy"]["range_turbine_rel"][st.session_state.level]
+        calc = cl.compute_claim(CTX["results"], (CTX["start"], CTX["end"]), contract, ov, rel)
+        cards = [("Claimable energy", f"{calc['claimable_kwh']:,.0f}<span>kWh</span>",
+                  f"{calc['waiting_kwh']:,.0f} kWh in the {calc['waiting_h']:g} h waiting period deducted")]
+        if calc.get("rate"):
+            cards.append(("Claim amount", f"EUR {calc['amount']:,.0f}",
+                          f"{st.session_state.level} % range EUR {calc['amount_lo']:,.0f} – {calc['amount_hi']:,.0f}" + (" · capped" if calc.get("capped") else "")))
+        if calc.get("notify_by"):
+            cards.append(("Notify the insurer by", f"{calc['notify_by']:%d %b %Y}", f"{calc['notice_days']:.0f} days after the outage ended"))
+        kpis(cards)
+        if calc.get("below_waiting"):
+            st.warning("The outage is shorter than the waiting period, so nothing is claimable under this contract.")
+        return contract, calc, no_excl, fp + json.dumps(ov, sort_keys=True) + str(no_excl)
 
 
 def page_report():
@@ -758,12 +848,15 @@ def page_report():
     if not need_results("report"):
         return
     results = CTX["results"]
+    contract, calc, no_excl, cfp = contract_card()
+    pre = contract.preamble if contract else {}
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     with st.container(key="card_details"):
         card_head("Claim details", "These appear in the email and the report.")
         c1, c2 = st.columns(2)
         park_name = c1.text_input("Wind park name", value=f"Wind park {'/'.join(sorted({park_of(t) for t in CTX['targets']}))}", key="park_name")
-        insurer = c2.text_input("Addressee", placeholder="Claims department", key="insurer")
-        policy = c1.text_input("Policy number", placeholder="Optional", key="policy")
+        insurer = c2.text_input("Addressee", value=pre.get("insurer", ""), placeholder="Claims department", key=f"insurer_{cfp[:10]}")
+        policy = c1.text_input("Policy number", value=pre.get("policy", ""), placeholder="Optional", key=f"policy_{cfp[:10]}")
         sender = c2.text_input("Your name", placeholder="Optional", key="sender")
 
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
@@ -771,13 +864,21 @@ def page_report():
     table = ac.results_table(results)
     with r1, st.container(key="card_email"):
         card_head("Insurance email", "Edit freely before sending.")
-        text = ac.email_text(results, (CTX["start"], CTX["end"]), st.session_state.level, park_name, insurer, policy, sender, st.session_state.density)
+        if contract:
+            if policy:
+                contract.preamble["policy"] = policy
+            refs = sorted({x for r in results for x in r["refs"]})
+            text = cl.claim_email(results, (CTX["start"], CTX["end"]), contract, calc, st.session_state.level, park_name, insurer,
+                                  sender, no_excl, refs, int(st.session_state.window_days))
+        else:
+            text = ac.email_text(results, (CTX["start"], CTX["end"]), st.session_state.level, park_name, insurer, policy, sender, st.session_state.density)
         edited = st.text_area("Email", value=text, height=460, label_visibility="collapsed", key=f"email_{hashlib.md5(text.encode()).hexdigest()[:8]}")
         st.download_button("Download email", edited, file_name="insite_claim_email.txt", mime="text/plain", key="dl_email")
     with r2, st.container(key="card_downloads"):
         card_head("Claim report", "A one-page report with figures, charts, accuracy and method. Open it in a browser and choose Print › Save as PDF.")
         with st.spinner("Preparing the report…"):
-            report = report_cached(CTX["key"], results, park_name, insurer, policy)
+            chtml = cl.report_section_html(contract, calc, st.session_state.level, esc) if contract else ""
+            report = report_cached(CTX["key"] + cfp, results, park_name, insurer, policy, chtml)
         st.download_button("Download claim report", report, file_name="insite_claim_report.html",
                            mime="text/html", type="primary", key="dl_report", width="stretch")
         st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
@@ -788,6 +889,9 @@ def page_report():
                    "air_density": bool(st.session_state.density), "total_kwh": CTX["total"], "range_kwh": [CTX["lo"], CTX["hi"]],
                    "turbines": {r["target"]: {"energy_kwh": r["energy_kwh"], "range_kwh": list(r["range_kwh"]), "references": r["refs"],
                                               **({"test_metrics": r["test_metrics"]} if "test_metrics" in r else {})} for r in results}}
+        if calc:
+            summary["claim"] = {k: (str(v) if isinstance(v, pd.Timestamp) else v) for k, v in calc.items()}
+            summary["claim"]["policy"] = contract.preamble.get("policy")
         st.download_button("Summary (JSON)", json.dumps(summary, indent=2, default=float), file_name="insite_claim_summary.json",
                            mime="application/json", key="dl_json", width="stretch")
 

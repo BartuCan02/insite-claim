@@ -1,0 +1,45 @@
+SAMPLE CONTRACT - FICTIONAL PARTIES - FOR DEMONSTRATION ONLY
+
+BUSINESS INTERRUPTION INSURANCE POLICY - ONSHORE WIND
+
+Policy No.: AR-BI-2026-0417
+Insurer: Aurora Renewables Insurance AG (fictional)
+Policyholder: Windpark T GmbH & Co. KG (fictional)
+Insured site: Wind park T, turbines T1, T2 and T3 (3 x 4,500 kW)
+Period of insurance: 1 January 2026 to 31 December 2026
+
+1 Definitions
+1.1 Interruption event means any loss of grid feed-in or loss of communication between the insured turbines and the operator's monitoring system (SCADA) that prevents the insured turbines from delivering electricity to the grid.
+1.2 Lost energy means the electricity the insured turbines would have generated during an interruption event, expressed in kWh.
+
+2 Insured assets
+2.1 This policy covers wind turbines T1, T2 and T3 of wind park T, each with a rated power of 4,500 kW, including the cabling to the grid connection point.
+
+3 Cover
+3.1 The Insurer indemnifies the Policyholder for loss of revenue from lost energy caused by an interruption event, including cable damage between the wind park and the grid connection station and technical faults that prevent electricity from being fed into the grid.
+
+4 Waiting period
+4.1 Each interruption event is subject to a waiting period of 12 consecutive hours. Lost energy during the waiting period is not indemnified.
+
+5 Indemnity and limits
+5.1 Lost energy is compensated at the agreed rate of EUR 0.0820 per kWh.
+5.2 The maximum indemnity per interruption event is EUR 250,000.
+5.3 The annual aggregate limit is EUR 1,000,000.
+
+6 Determination of lost energy
+6.1 Where measurements of the insured turbines are unavailable, lost energy shall be determined from wind measurements of reference turbines in neighbouring wind parks, applied to the certified power curves of the insured turbines.
+6.2 The method used and its uncertainty shall be documented and shall have been validated on historical data.
+6.3 Supporting wind speed and power time series shall be provided at 10-minute resolution.
+
+7 Claims procedure
+7.1 The Policyholder shall notify the Insurer of an interruption event in writing within 14 days of its end.
+7.2 The claim shall state the start and end of the event, the affected turbines, the lost energy and the claimed amount, and shall include the supporting documentation under clause 6.
+
+8 Exclusions
+8.1 Lost energy is not indemnified during planned maintenance or during curtailment ordered by the grid operator.
+8.2 Losses caused by wilful misconduct of the Policyholder are excluded.
+
+9 Payment
+9.1 The Insurer shall pay the indemnity within 30 days of receiving the complete claim documentation.
+
+Signed for the Insurer and the Policyholder (sample - not a real agreement).
