@@ -666,14 +666,17 @@ def page_method():
         chart(style(f, h, legend=False), key="scatter_chart")
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     with st.container(key="card_heat"):
-        card_head("Correlation between all turbines", "Training days. Turbines in the same park move together most closely.")
-        C = wide["wind_speed"].iloc[r["train_idx"]].corr()
-        f = go.Figure(go.Heatmap(z=C.values, x=list(C.columns), y=list(C.index), zmin=0.5, zmax=1, text=C.round(2).values, texttemplate="%{text}",
+        card_head("Affected turbines against reference turbines",
+                  "Correlation over the training days. The higher the value, the better that turbine works as a reference.")
+        tgts = [x["target"] for x in results]
+        refs_all = [t for t in CTX["turbines"] if park_of(t) not in {park_of(x) for x in tgts}]
+        C = wide["wind_speed"].iloc[r["train_idx"]][tgts + refs_all].corr().loc[tgts, refs_all]
+        f = go.Figure(go.Heatmap(z=C.values, x=list(C.columns), y=list(C.index), zmin=0.5, zmax=0.85, text=C.round(2).values, texttemplate="%{text}",
                                  colorscale=[[0, "#f5f5f7"], [0.5, "#9ec9f5"], [1, BLUE]], showscale=False, xgap=3, ygap=3,
                                  hovertemplate="%{y} · %{x}: %{z:.2f}<extra></extra>"))
         f.update_layout(hovermode="closest")
         f.update_yaxes(autorange="reversed", showgrid=False)
-        chart(style(f, 460, legend=False), key="heat_chart")
+        chart(style(f, 90 + 72 * len(tgts), legend=False), key="heat_chart")
     if st.session_state.density and r.get("air_density") is not None:
         st.caption(f"Air density during the outage, estimated from the reference parks: {np.mean(r['air_density']):.3f} kg/m³ (standard air 1.225).")
 
