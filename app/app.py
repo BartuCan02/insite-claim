@@ -278,8 +278,8 @@ with tabs[2]:
 | setup | what it does | power RMSE | wind RMSE | total energy deviation |
 |---|---|---|---|---|
 | **Simple baseline** | Linear regression (ridge) on the current wind speed of all 7 reference turbines. Wind put straight through the power curve. | 677 kW | 1.19 m/s | −13.7 % |
-| **This tool, without energy correction** | Top-5 references picked by correlation. Inputs: their wind now, each park's wind 10/30/60 min earlier and later, wind direction, turbulence, how much the references agree. Prediction = 60 % linear model + 40 % LightGBM (many small decision trees). Wind put straight through the power curve. | 631 kW | 1.13 m/s | −11.2 % |
-| **This tool** | Same wind prediction, but the power curve is averaged over the typical wobble of real wind around the estimate (about ±1.1 m/s). This removes the systematic under-estimate of energy. | 621 kW | 1.13 m/s | −2.0 % |
+| **This tool, without energy correction** | Top-5 references picked by correlation. Inputs: their wind now, each park's wind 10/30/60 min earlier and later, each park's wind at the travel-time lag learned for the current wind direction, wind direction, turbulence, how much the references agree. Trained on labels smoothed over 90 min. Prediction = 70 % linear model + 30 % LightGBM (many small decision trees). Wind put straight through the power curve. | 625 kW | 1.11 m/s | −11.4 % |
+| **This tool** | Same wind prediction, but the power curve is averaged over the typical wobble of real wind around the estimate (about ±1.1 m/s). This removes the systematic under-estimate of energy. | 615 kW | 1.11 m/s | −2.3 % |
 """)
     st.caption("Wind RMSE is the same in the last two rows because only the step from wind to energy differs.")
 
@@ -290,8 +290,9 @@ with tabs[3]:
 followed the affected turbine over the {window_days} training days (correlation). The top 5 are used.
 
 **2. Learn the link between the parks.** Two models learn the affected turbine's wind from the references' wind, the wind 10, 30 and 60 minutes
-earlier and later (wind travels between parks), wind direction, turbulence and how much the references agree. A linear model (60 %) and
-gradient-boosted trees (40 %) are averaged.
+earlier and later (wind travels between parks), wind direction, turbulence and how much the references agree. A linear model (70 %) and
+gradient-boosted trees (30 %) are averaged. Wind needs time to travel between parks, and how long depends on the
+wind direction, so for each direction the travel-time lag that fits best is learned from the training days.
 
 **3. Rebuild the missing wind** during the outage from the references, which kept measuring.
 

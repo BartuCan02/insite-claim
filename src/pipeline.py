@@ -17,7 +17,7 @@ from core import candidate_references
 from fe import build_all, select
 from search_lib import make_model
 
-RECIPE = json.loads((Path(__file__).resolve().parents[1] / "outputs/search/final_recipe.json").read_text())
+RECIPE = json.loads((Path(__file__).resolve().parent / "recipe.json").read_text())
 
 
 def pick_references(wide: pd.DataFrame, target: str, tr: np.ndarray, k: int = 5) -> list[str]:
@@ -45,6 +45,15 @@ class BlendModel:
         if not self.refs:
             self.refs = pick_references(wide, self.target, tr)
         self.Xr, self.Xl = self._X(wide, "ridge"), self._X(wide, "lgbm")
+        if RECIPE.get("advect"):
+            from advect import advect_features
+
+            adv = advect_features(wide, self.refs, tr, y, **RECIPE["advect"])
+            self.Xr, self.Xl = np.hstack([self.Xr, adv]), np.hstack([self.Xl, adv])
+        if RECIPE.get("target_smooth"):
+            only_tr = np.full(len(y), np.nan)
+            only_tr[tr] = y[tr]  # smooth labels using training rows only
+            y = pd.Series(only_tr).rolling(RECIPE["target_smooth"], center=True, min_periods=1).mean().to_numpy()
         sw = None if sample_weight is None else sample_weight[tr]
         rkw = {} if sw is None else {"ridge__sample_weight": sw}
         lkw = {} if sw is None else {"sample_weight": sw}
