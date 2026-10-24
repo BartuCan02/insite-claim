@@ -1374,9 +1374,17 @@ def pz_scroll(target):
     }});
   }}
   const sel = {json.dumps('.st-key-' + target) if target else 'null'};
-  if (!sel) {{ window.scrollTo({{top: 0, behavior: 'smooth'}}); return; }}
+  const scroller = (el) => {{ let q = el ? el.parentElement : null; while (q) {{ const o = getComputedStyle(q).overflowY;
+      if ((o === 'auto' || o === 'scroll') && q.scrollHeight > q.clientHeight) return q; q = q.parentElement; }}
+      return document.querySelector('[data-testid="stMain"]') || document.scrollingElement; }};
+  if (!sel) {{ const m = scroller(document.querySelector('.stMain [data-testid="stVerticalBlock"]')); m.scrollTo({{top: 0, behavior: 'smooth'}}); return; }}
   let n = 0;
-  const go = () => {{ const el = document.querySelector(sel); if (el) {{ const r = el.getBoundingClientRect(); const tall = r.height > window.innerHeight * 0.78; const y = window.scrollY + r.top - (tall ? 84 : (window.innerHeight - r.height) / 2); window.scrollTo({{top: Math.max(0, y), behavior: 'smooth'}}); }} else if (n++ < 50) setTimeout(go, 100); }};
+  const go = () => {{ const el = document.querySelector(sel);
+    if (!el) {{ if (n++ < 200) setTimeout(go, 100); return; }}
+    const sc = scroller(el); const r = el.getBoundingClientRect(); const top0 = sc.getBoundingClientRect ? sc.getBoundingClientRect().top : 0;
+    const tall = r.height > window.innerHeight * 0.78;
+    const y = sc.scrollTop + r.top - top0 - (tall ? 84 : (window.innerHeight - r.height) / 2);
+    sc.scrollTo({{top: Math.max(0, y), behavior: 'smooth'}}); }};
   setTimeout(go, 250);
 }})();
 </script>""", unsafe_allow_javascript=True)

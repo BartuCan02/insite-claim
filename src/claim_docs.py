@@ -9,7 +9,6 @@ import csv
 import io
 import json
 import math
-import re
 import zipfile
 from pathlib import Path
 
