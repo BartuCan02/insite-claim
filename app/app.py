@@ -1254,7 +1254,7 @@ def page_report():
 
 
 # ------------------------------------------------------------------ presentation mode
-STAGE_SUBS = {6: 3, 7: 2}
+STAGE_SUBS = {6: 3}
 KEEP_KEYS = ["pz_ui", "pz_uic", "pz_exit", "pz_cap", "pz_float", "pz_cine", "pz_load", "pz_tech"]
 
 
@@ -1607,9 +1607,7 @@ def page_present():
         pz_caption(cap)
         page_analysis(present=True)
     else:
-        if s_ == 7 and k == 1:
-            target, cap = None, "Bonus challenges · <b>all three built in</b>"
-        elif s_ == 7:
+        if s_ == 7:
             contract, _, _ = contract_and_calc()
             n = sum(1 for t in contract.terms.values() if t.clause) if contract else 0
             target = "card_contract"
@@ -1617,8 +1615,6 @@ def page_present():
         else:
             target, cap = "card_composer", "From missing data to <b>a defensible claim.</b>"
         spotlight(target)
-        if s_ == 7 and k == 1:
-            stage_bonus()
         pz_caption(cap)
         page_report()
     pz_nav()
