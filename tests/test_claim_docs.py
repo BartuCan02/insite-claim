@@ -84,6 +84,35 @@ def test_report_pdf_without_contract_and_with_non_latin1_park_name(real):
     assert f"{real['ctx']['total']:,.0f}" in text and "Wind park T - north EUR" in text
 
 
+def test_report_pdf_fits_many_long_named_turbines(real):
+    """Six long turbine names: the KPI note is shortened to fit its tile and names are not broken mid-word."""
+    big = []
+    for i in range(6):
+        r = dict(real["results"][i % 3], target=f"WTG-{i + 1:02d}-Nordsee")
+        r["refs"] = list(r["refs"]) + ["REF-ALPHA-LONG", "REF-BRAVO-LONG"]
+        big.append(r)
+    ctx = dict(real["ctx"], total=sum(r["energy_kwh"] for r in big))
+    calc = compute_claim(big, (ctx["start"], ctx["end"]), real["contract"], {"rate_eur_kwh": 0.12345}, 0.171)
+    text, pages = pdf_text(cd.report_pdf(big, ctx, real["contract"], calc, "90", "P", "", "", 30, 70, 30, True))
+    assert 2 <= pages <= 3
+    assert all(r["target"] in text for r in big)
+    assert "WTG-01-Nordsee, WTG-02-Nordsee" in text and "..." in text
+    assert ", ".join(r["target"] for r in big) not in text
+    assert f"EUR 0.12345 = EUR {calc['claimable_kwh'] * 0.12345:,.2f}" in text
+
+
+def test_clip_and_legend_columns():
+    pdf = cd._Report(format="A4", unit="mm")
+    pdf.add_page()
+    pdf.set_font(cd.FONT, "", 8)
+    assert cd._clip(pdf, "T1, T2, T3", 40) == "T1, T2, T3"
+    short = cd._clip(pdf, ", ".join(f"WTG-{i:02d}-Nordsee" for i in range(10)), 40)
+    assert short.endswith("...") and pdf.get_string_width(short) <= 40
+    assert cd._legend_cols(["T1", "T2", "T3"]) == 3
+    assert 1 <= cd._legend_cols([f"WTG-{i:02d}-Nordsee" for i in range(6)]) < 6
+    assert cd._legend_cols(["A" * 80, "B"]) == 1
+
+
 def test_evidence_zip_holds_the_real_data(real, evidence):
     results, ctx = real["results"], real["ctx"]
     assert set(FILES) <= set(evidence.namelist())

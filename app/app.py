@@ -192,7 +192,7 @@ div[class*="st-key-att_row_"] button { min-height:30px !important; padding:0 8px
 .pz2 { background: radial-gradient(900px 340px at 62% 60%, rgba(255,214,170,.65), transparent 70%), radial-gradient(1400px 380px at 50% 88%, rgba(255,255,255,.75), transparent 70%),
   linear-gradient(180deg,#7fa6d4 0%,#c9d8ea 34%,#f3e2d1 58%,#e9cdb6 68%,#93a08d 84%,#5f6d5c 100%); }
 .pz2 h1 { color:#1d1d1f; } .pz2 h1 b { color:#1d1d1f; } .pz2 p { color:#3a3a3c; }
-.st-key-pz_float { left:50%; top:76px; transform:translateX(-50%); width:min(780px, 92vw) !important; max-height:calc(100vh - 160px); overflow-y:auto;
+.st-key-pz_float { left:0; right:0; margin:0 auto; top:76px; width:min(780px, 92vw) !important; max-height:calc(100vh - 160px); overflow-y:auto;
   background:rgba(255,255,255,.80); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%);
   border:1px solid rgba(255,255,255,.7); border-radius:28px; padding:28px 30px !important; box-shadow:0 40px 100px rgba(16,24,40,.22); animation: pzin .45s ease both; }
 .st-key-pz_float.wide, .st-key-pz_tech { width:min(1060px, 94vw) !important; }
