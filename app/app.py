@@ -1518,6 +1518,21 @@ def stage_loading():
         st.button("Back to inputs", key="pz_retry", type="primary", on_click=pres_go, args=(3,))
 
 
+def metrics_html():
+    res = CTX["results"]
+    tm = [r["test_metrics"] for r in res if "test_metrics" in r]
+    tw = CTX["test_window"]
+    if not tm or not tw or len(tm) != len(res):
+        return ""
+    et, ep = sum(m["energy_true_kwh"] for m in tm), sum(m["energy_pred_kwh"] for m in tm)
+    vals = [("Wind RMSE", f"{np.mean([m['wind_rmse'] for m in tm]):.2f} m/s"), ("Wind MAE", f"{np.mean([m['wind_mae'] for m in tm]):.2f} m/s"),
+            ("Power RMSE", f"{np.mean([m['power_rmse'] for m in tm]):,.0f} kW"), ("Power MAE", f"{np.mean([m['power_mae'] for m in tm]):,.0f} kW"),
+            ("Summed energy", f"{100 * (ep - et) / et:+.1f} %")]
+    tiles = "".join(f"<div class='st'><div class='l'>{esc(a_)}</div><div class='v' style='font-size:20px'>{esc(b_)}</div></div>" for a_, b_ in vals)
+    return (f"<div class='mlab' style='margin-top:14px'>Accuracy on measured data, {tw[0]:%d}–{tw[1]:%d %b} (model trained only on the days before the outage)</div>"
+            f"<div class='flow' style='grid-template-columns:repeat(5,1fr);margin-top:8px'>{tiles}</div>")
+
+
 def stage_tech():
     bars = [("Time shifts", -17, BLUE), ("Rolling averages", -14, BLUE), ("Wind direction", -14, BLUE), ("Turbulence", -2, BLUE),
             ("Hour of day", 1, ORANGE), ("Air pressure", 2, ORANGE), ("Temperature", 5, ORANGE)]
@@ -1535,6 +1550,7 @@ def stage_tech():
     with st.container(key="pz_tech"):
         st.markdown("<div class='pzh'>How the wind is rebuilt — and how we found the model</div>"
                     f"<div class='flow' style='grid-template-columns:1fr 22px 1fr 22px 1fr'>{io_html}</div>"
+                    + metrics_html()
                     "<div class='pztech' style='margin-top:14px'>"
                     "<div class='col'><h3>How we found it: staged grid search</h3><table class='t'><thead><tr><th>Stage</th><th>Tried</th><th>Won</th></tr></thead>"
                     f"<tbody>{srows}</tbody></table><div class='pzsmall'>65,000+ trained models, each scored on 84 simulated 3-day outages. "
