@@ -1527,8 +1527,10 @@ def metrics_html():
     et, ep = sum(m["energy_true_kwh"] for m in tm), sum(m["energy_pred_kwh"] for m in tm)
     vals = [("Wind RMSE", f"{np.mean([m['wind_rmse'] for m in tm]):.2f} m/s"), ("Wind MAE", f"{np.mean([m['wind_mae'] for m in tm]):.2f} m/s"),
             ("Power RMSE", f"{np.mean([m['power_rmse'] for m in tm]):,.0f} kW"), ("Power MAE", f"{np.mean([m['power_mae'] for m in tm]):,.0f} kW"),
-            ("Summed energy", f"{100 * (ep - et) / et:+.1f} %")]
-    tiles = "".join(f"<div class='st'><div class='l'>{esc(a_)}</div><div class='v' style='font-size:20px'>{esc(b_)}</div></div>" for a_, b_ in vals)
+            ("Summed energy", f"{100 * (ep - et) / et:+.1f} %",
+             f"estimated {ep:,.0f} kWh vs measured {et:,.0f} kWh over the 6 days · {'too high' if ep > et else 'too low'} by {abs(ep - et):,.0f} kWh")]
+    tiles = "".join(f"<div class='st'><div class='l'>{esc(v[0])}</div><div class='v' style='font-size:20px'>{esc(v[1])}</div>"
+                    + (f"<div class='c'>{esc(v[2])}</div>" if len(v) > 2 else "") + "</div>" for v in vals)
     return (f"<div class='mlab' style='margin-top:14px'>Accuracy on measured data, {tw[0]:%d}–{tw[1]:%d %b} (model trained only on the days before the outage)</div>"
             f"<div class='flow' style='grid-template-columns:repeat(5,1fr);margin-top:8px'>{tiles}</div>")
 
