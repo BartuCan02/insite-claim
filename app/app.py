@@ -6,8 +6,13 @@ from __future__ import annotations
 
 import hashlib
 import html
+import io
 import json
 import sys
+import time
+import zipfile
+from email.message import EmailMessage
+from urllib.parse import quote
 from pathlib import Path
 
 import numpy as np
@@ -132,6 +137,101 @@ LOGO = (f'<svg width="24" height="24" viewBox="-20 -22 40 46" aria-hidden="true"
         + f'<circle r="2.4" fill="{TEXT1}"/></svg>')
 
 
+
+CSS2 = """
+<style>
+.kic { width:34px; height:34px; border-radius:10px; background:#e8f2fd; display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
+.flow { display:grid; grid-template-columns: 1fr 22px 1fr 22px 1fr 22px 1fr; gap:6px; align-items:stretch; margin:16px 0 6px; }
+.flow .st { background:#f5f5f7; border-radius:14px; padding:14px 16px; }
+.flow .st:last-child { background:#e8f2fd; }
+.flow .l { font-size:12px; color:#6e6e73; font-weight:500; } .flow .v { font-size:22px; font-weight:600; color:#1d1d1f; margin:4px 0 2px; font-variant-numeric:tabular-nums; }
+.flow .c { font-size:12px; color:#86868b; line-height:1.4; } .flow .arr { display:flex; align-items:center; justify-content:center; color:#86868b; font-size:22px; }
+.trail .it { display:flex; gap:14px; align-items:flex-start; padding:12px 0; border-bottom:1px solid #e8e8ed; position:relative; }
+.trail .it:last-child { border-bottom:none; }
+.trail .dot { flex:0 0 26px; height:26px; border-radius:50%; background:#e9f6ec; color:#248a3d; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.trail .tx { flex:1; } .trail .tx b { display:block; font-size:15px; font-weight:600; color:#1d1d1f; } .trail .tx span { font-size:13px; color:#6e6e73; line-height:1.5; }
+.trail .tag { font-size:12px; font-weight:600; color:#248a3d; background:#e9f6ec; border-radius:980px; padding:3px 10px; white-space:nowrap; }
+.atth { font-size:13px; font-weight:600; color:#6e6e73; margin:14px 0 6px; }
+div[class*="st-key-att_row_"] { background:#fafafc; border:1px solid #e8e8ed; border-radius:12px; padding:4px 10px; margin-bottom:6px; }
+div[class*="st-key-att_row_"] [data-testid="stHorizontalBlock"] { gap:8px; }
+div[class*="st-key-att_row_"] button { min-height:30px !important; padding:0 8px !important; color:#6e6e73 !important; font-size:18px !important; }
+.attn { font-size:14px; font-weight:500; color:#1d1d1f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.atts { font-size:13px; color:#86868b; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.st-key-card_composer [data-testid="stTextInput"] label p, .st-key-card_composer [data-testid="stTextArea"] label p { font-size:12px; color:#6e6e73; }
+.st-key-dl_eml button { background: linear-gradient(180deg,#1a8cff,#0071e3) !important; border:none !important; color:#fff !important; }
+
+/* presentation mode */
+.st-key-pz_ui, .st-key-pz_uic, .st-key-pz_exit, .st-key-pz_cap, .st-key-pz_float, .st-key-pz_load { position:fixed !important; z-index:1000; }
+.st-key-pz_ui { right:28px; bottom:26px; width:auto !important; background:rgba(255,255,255,.86); backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%); border:1px solid rgba(0,0,0,.06); border-radius:980px; padding:6px 8px 6px 10px; box-shadow:0 12px 40px rgba(0,0,0,.14); align-items:center; }
+.st-key-pz_uic { left:50%; transform:translateX(-50%); bottom:64px; width:auto !important; align-items:center; gap:18px !important; }
+.st-key-pz_uic button { background:rgba(20,22,26,.30) !important; border:1px solid rgba(255,255,255,.65) !important; color:#fff !important;
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); min-width:170px; min-height:48px !important; font-size:17px !important; }
+.st-key-pz_uic button p { font-size:17px !important; color:#fff !important; }
+.st-key-pz_exit { right:24px; top:18px; width:auto !important; align-items:center; }
+.st-key-pz_exit button { color:#6e6e73 !important; }
+.pzfs { background:transparent; border:none; color:#6e6e73; font:500 13px -apple-system,BlinkMacSystemFont,Arial; cursor:pointer; padding:6px 10px; border-radius:980px; }
+.pzfs:hover { background:rgba(0,0,0,.05); }
+.pzprog { font:500 13px -apple-system,BlinkMacSystemFont,Arial; color:#6e6e73; padding:0 8px; white-space:nowrap; font-variant-numeric:tabular-nums; display:flex; gap:8px; align-items:center; }
+.pzprog span { display:inline-flex; gap:4px; } .pzprog i { width:6px; height:6px; border-radius:50%; background:#d2d2d7; display:inline-block; } .pzprog i.on { background:#0071e3; }
+.st-key-pz_uic .pzprog { color:rgba(255,255,255,.8); }
+.st-key-pz_cap { top:22px; left:50%; transform:translateX(-50%); width:auto !important; }
+.pzcap { background:rgba(29,29,31,.88); color:#fff; padding:11px 22px; border-radius:980px; font:500 17px -apple-system,BlinkMacSystemFont,Arial;
+  letter-spacing:-0.01em; box-shadow:0 10px 30px rgba(0,0,0,.18); white-space:nowrap; backdrop-filter:blur(10px); animation: pzin .45s ease both; }
+.pzcap b { color:#64b5ff; font-weight:600; }
+@keyframes pzin { from { opacity:0; transform:translateY(-6px) scale(.98); } to { opacity:1; transform:none; } }
+.st-key-pz_cine { position:fixed !important; inset:0; z-index:900; }
+.pzc { position:fixed; inset:0; z-index:900; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; overflow:hidden; animation: pzfade .6s ease both; }
+@keyframes pzfade { from { opacity:0; } to { opacity:1; } }
+.pzc h1 { font:300 76px/1.08 -apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',Arial; letter-spacing:-0.035em; margin:0; position:relative; z-index:2; }
+.pzc h1 b { font-weight:700; }
+.pzc p { font:400 21px/1.4 -apple-system,BlinkMacSystemFont,Arial; margin:22px 0 0; position:relative; z-index:2; }
+.pzc svg.sil { position:absolute; left:0; right:0; bottom:0; width:100%; height:62%; z-index:1; }
+.pz1 { background: radial-gradient(1200px 500px at 50% 82%, rgba(210,215,224,.28), transparent 70%), linear-gradient(180deg,#1f2b3c 0%,#3b4b62 38%,#6f7b8c 64%,#3a3f47 82%,#1a1d22 100%); }
+.pz1 h1 { color:#f5f5f7; } .pz1 p { color:rgba(245,245,247,.7); }
+.pz2 { background: radial-gradient(900px 340px at 62% 60%, rgba(255,214,170,.65), transparent 70%), radial-gradient(1400px 380px at 50% 88%, rgba(255,255,255,.75), transparent 70%),
+  linear-gradient(180deg,#7fa6d4 0%,#c9d8ea 34%,#f3e2d1 58%,#e9cdb6 68%,#93a08d 84%,#5f6d5c 100%); }
+.pz2 h1 { color:#1d1d1f; } .pz2 h1 b { color:#1d1d1f; } .pz2 p { color:#3a3a3c; }
+.st-key-pz_float { left:50%; top:76px; transform:translateX(-50%); width:min(780px, 92vw) !important; max-height:calc(100vh - 160px); overflow-y:auto;
+  background:rgba(255,255,255,.80); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border:1px solid rgba(255,255,255,.7); border-radius:28px; padding:28px 30px !important; box-shadow:0 40px 100px rgba(16,24,40,.22); animation: pzin .45s ease both; }
+.st-key-pz_float.wide, .st-key-pz_tech { width:min(1060px, 94vw) !important; }
+div[class*="st-key-pz_r"] { background:#fff; border-radius:18px; padding:14px 18px; box-shadow:0 1px 2px rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.05); }
+.pzic { width:44px; height:44px; border-radius:50%; background:#f2f2f4; display:flex; align-items:center; justify-content:center; }
+.pzrl { font-size:12px; color:#6e6e73; font-weight:500; margin-bottom:2px; }
+.pzh { font:600 30px/1.15 -apple-system,BlinkMacSystemFont,'SF Pro Display',Arial; letter-spacing:-0.02em; color:#1d1d1f; margin:2px 0 6px; }
+.pzs { font-size:15px; color:#6e6e73; margin-bottom:16px; }
+.st-key-pz_analyze button { background:linear-gradient(180deg,#2d95ff,#0071e3) !important; border:none !important; min-height:54px !important; font-size:18px !important; box-shadow:0 10px 26px rgba(0,113,227,.35) !important; }
+.st-key-pz_analyze button p { font-size:18px !important; font-weight:600 !important; }
+.st-key-pz_load { inset:0; display:flex; align-items:center; justify-content:center; background:rgba(245,245,247,.35); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.pzl { width:340px; background:#fff; border-radius:28px; padding:36px 28px 30px; text-align:center; box-shadow:0 40px 100px rgba(16,24,40,.22); animation: pzin .4s ease both; }
+.pzring { position:relative; width:132px; height:132px; margin:0 auto 18px; }
+.pzring svg { transform:rotate(-90deg); }
+.pzring .arc { stroke-dasharray: 340; stroke-dashoffset: 340; animation: pzarc 2.4s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes pzarc { to { stroke-dashoffset: 0; } }
+.pzring .num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font:600 28px -apple-system,Arial; color:#1d1d1f; font-variant-numeric:tabular-nums; }
+.pzring .num::after { content:"0%"; animation: pznum 2.4s linear forwards; }
+@keyframes pznum { 0% { content:"0%"; } 8% { content:"12%"; } 16% { content:"27%"; } 24% { content:"41%"; } 32% { content:"54%"; } 40% { content:"64%"; } 50% { content:"73%"; } 60% { content:"81%"; } 70% { content:"88%"; } 80% { content:"94%"; } 90% { content:"98%"; } 100% { content:"100%"; } }
+.pzl b { display:block; font:500 18px -apple-system,Arial; color:#1d1d1f; }
+.pzrot { position:relative; height:20px; margin-top:8px; font-size:13px; color:#86868b; }
+.pzrot span { position:absolute; left:0; right:0; opacity:0; animation: pzrot 2.4s linear forwards; }
+.pzrot span:nth-child(2) { animation-delay: .8s; } .pzrot span:nth-child(3) { animation-delay: 1.6s; animation-name: pzrotlast; }
+@keyframes pzrot { 0% { opacity:0 } 10% { opacity:1 } 30% { opacity:1 } 40% { opacity:0 } 100% { opacity:0 } }
+@keyframes pzrotlast { 0% { opacity:0 } 10% { opacity:1 } 100% { opacity:1 } }
+.pztech { display:grid; grid-template-columns: 1fr 1fr; gap:22px; }
+.pztech .col { background:#fff; border-radius:20px; padding:22px 24px; border:1px solid rgba(0,0,0,.05); }
+.pztech h3 { font:600 19px -apple-system,Arial; margin:0 0 12px; color:#1d1d1f; letter-spacing:-0.01em; }
+.pzstep { display:flex; gap:12px; align-items:flex-start; padding:9px 0; }
+.pzstep .n { flex:0 0 24px; height:24px; border-radius:50%; background:#e8f2fd; color:#0071e3; font:600 12px Arial; display:flex; align-items:center; justify-content:center; }
+.pzstep b { display:block; font-size:15px; color:#1d1d1f; } .pzstep span { font-size:13px; color:#6e6e73; }
+.pzbar { display:grid; grid-template-columns: 130px 1fr 60px; gap:10px; align-items:center; padding:5px 0; font-size:13px; color:#1d1d1f; }
+.pzbar .tr { height:10px; background:#f2f2f4; border-radius:6px; overflow:hidden; } .pzbar .fl { height:10px; border-radius:6px; }
+.pzbar .vv { text-align:right; color:#6e6e73; font-variant-numeric:tabular-nums; }
+.pzsmall { font-size:12px; color:#86868b; margin-top:10px; line-height:1.5; }
+</style>
+"""
+
+
 # ------------------------------------------------------------------ helpers
 def esc(x):
     return html.escape(str(x))
@@ -139,8 +239,19 @@ def esc(x):
 
 def kpis(cards):
     st.markdown("<div class='kgrid'>" + "".join(
-        f"<div class='kpi'><div class='l'>{esc(a)}</div><div class='v'>{b}</div><div class='c'>{esc(c)}</div></div>" for a, b, c in cards)
-        + "</div>", unsafe_allow_html=True)
+        f"<div class='kpi'>{(c[3] if len(c) > 3 else '')}<div class='l'>{esc(c[0])}</div><div class='v'>{c[1]}</div><div class='c'>{esc(c[2])}</div></div>"
+        for c in cards) + "</div>", unsafe_allow_html=True)
+
+
+def kicon(path):
+    return (f"<div class='kic'><svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='#0071e3' stroke-width='2' "
+            f"stroke-linecap='round' stroke-linejoin='round'>{path}</svg></div>")
+
+
+IC_BOLT = "<path d='M13 2 4 14h7l-1 8 9-12h-7z'/>"
+IC_COIN = "<ellipse cx='12' cy='6' rx='8' ry='3'/><path d='M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6'/><path d='M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'/>"
+IC_SHIELD = "<path d='M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z'/><path d='m9 12 2 2 4-4'/>"
+IC_CLOCK = "<circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/>"
 
 
 def section(title, sub=None):
@@ -189,6 +300,23 @@ def _seg_keep(key):
         st.session_state[key] = st.session_state.get("_last_" + key)
 
 
+def _bound_change(key, state_key):
+    v = st.session_state.get(key)
+    if v is None:
+        st.session_state[key] = st.session_state[state_key]
+    else:
+        st.session_state[state_key] = v
+
+
+def segmented_bound(label, options, key, state_key, fmt=None):
+    """Segmented control tied to a persistent setting (stays in sync across pages and presentation mode)."""
+    if st.session_state.get(key) != st.session_state[state_key]:
+        st.session_state[key] = st.session_state[state_key]
+    kw = {"format_func": fmt} if fmt else {}
+    st.segmented_control(label, options, key=key, on_change=_bound_change, args=(key, state_key), label_visibility="collapsed", **kw)
+    return st.session_state[state_key]
+
+
 def segmented(label, options, key, default=None, fmt=None):
     """Single-choice segmented control that never ends up empty (clicking the active segment keeps it)."""
     last = st.session_state.get("_last_" + key, default if default is not None else options[0])
@@ -206,7 +334,8 @@ def segmented(label, options, key, default=None, fmt=None):
 # ------------------------------------------------------------------ persistent settings (survive page switches)
 DEFAULTS = {"source": "Example dataset", "window_days": RECIPE["training_window_days"], "level": "90", "density": False,
             "min_gap_h": 6.0, "outage": None, "targets": None, "fp": None, "uploads_w": (), "uploads_c": (), "park": None,
-            "contract_src": "Sample contract", "contract_up": None}
+            "contract_src": "Sample contract", "contract_up": None, "ovs": {}, "stage": 1, "sub": 0, "stage_t": 0.0,
+            "att_removed": [], "att_extra": [], "att_n": 0}
 for k, v in DEFAULTS.items():
     st.session_state.setdefault(k, v)
 
@@ -405,10 +534,7 @@ def page_overview():
     # ---------------- data source
     section("Data source", "One file per turbine (CSV or Excel), plus the power curves of the affected turbines.")
     with st.container(key="card_data"):
-        src = segmented("Source", ["Example dataset", "Upload files"], "_source", default=st.session_state.source)
-        if src != st.session_state.source:
-            st.session_state.source = src
-            st.rerun()
+        segmented_bound("Source", ["Example dataset", "Upload files"], "_source", "source")
         if st.session_state.source == "Upload files":
             u1, u2 = st.columns(2)
             u1.file_uploader("Wind data", type=["csv", "xlsx"], accept_multiple_files=True, key="_up_w", on_change=keep_uploads, args=("w",),
@@ -432,17 +558,41 @@ def settings_popover():
         st.slider("Training days before the outage", 7, 60, int(st.session_state.window_days), key="_window_days", on_change=keep, args=("window_days",),
                   help="The model learns the link between the parks only from this period.")
         st.caption("Confidence of the range")
-        lv = segmented("Confidence of the range", ["80", "90"], "_level", default=st.session_state.level, fmt=lambda x: f"{x} %")
-        if lv != st.session_state.level:
-            st.session_state.level = lv
-            st.rerun()
+        segmented_bound("Confidence of the range", ["80", "90"], "_level", "level", fmt=lambda x: f"{x} %")
         st.toggle("Air density correction", value=bool(st.session_state.density), key="_density", on_change=keep, args=("density",),
                   help="Adjusts the power curve for air density from temperature and pressure (IEC 61400-12). Changes results by about 2 %.")
         st.number_input("Gaps longer than this count as an outage (hours)", 1.0, 48.0, float(st.session_state.min_gap_h), 1.0,
                         key="_min_gap_h", on_change=keep, args=("min_gap_h",))
 
 
-def page_analysis():
+def kpi_cards():
+    results, lv = CTX["results"], st.session_state.level
+    _, calc, _ = contract_and_calc()
+    cards = [("Estimated energy loss", f"{CTX['total']:,.0f}<span>kWh</span>",
+              f"{lv} % range {CTX['lo']/1000:,.0f}–{CTX['hi']/1000:,.0f} MWh · {len(results)} turbines", kicon(IC_BOLT))]
+    if calc and calc.get("rate"):
+        exposure = calc["total_kwh"] * calc["rate"]
+        cards.append(("Claim estimate", f"EUR {calc['amount']:,.0f}",
+                      f"of EUR {exposure:,.0f} lost revenue · after the {calc['waiting_h']:g} h waiting period · subject to coverage review", kicon(IC_COIN)))
+    else:
+        cards.append(("Claim estimate", "—", "Add the insurance contract on the Claim report page", kicon(IC_COIN)))
+    tm = [r["test_metrics"] for r in results if "test_metrics" in r]
+    tw = CTX["test_window"]
+    if tm and tw and len(tm) == len(results):
+        mae = float(np.mean([m["wind_mae"] for m in tm]))
+        et, ep = sum(m["energy_true_kwh"] for m in tm), sum(m["energy_pred_kwh"] for m in tm)
+        cards.append(("Validated accuracy", f"{mae:.2f}<span>m/s</span>",
+                      f"wind MAE against measured data, {tw[0]:%d}–{tw[1]:%d %b} · summed energy {100 * (ep - et) / et:+.1f} %", kicon(IC_SHIELD)))
+    else:
+        mae = float(np.mean([r["inner_metrics"]["wind_mae"] for r in results]))
+        cards.append(("Back-tested accuracy", f"{mae:.2f}<span>m/s</span>", "wind MAE on the training days, each piece hidden in turn", kicon(IC_SHIELD)))
+    cards.append(("Outage duration", f"{CTX['hours']:.0f}<span>h</span>",
+                  f"{CTX['start']:%d %b %H:%M} → {CTX['end'] + pd.Timedelta(minutes=10):%d %b %H:%M}", kicon(IC_CLOCK)))
+    with st.container(key="kpiwrap"):
+        kpis(cards)
+
+
+def page_analysis(present=False):
     h1, h2 = st.columns([5, 1], vertical_alignment="bottom")
     with h1:
         section("Analysis", "Rebuilt wind and lost energy for the outage.")
@@ -468,13 +618,7 @@ def page_analysis():
                            label_visibility="collapsed", placeholder="Choose affected turbines")
             refs = [t for t in CTX["turbines"] if park_of(t) not in {park_of(x) for x in CTX["targets"]}]
             st.caption(f"Reference pool: {', '.join(refs)}")
-    mean_wind = float(np.mean(np.concatenate([r["wind_pred"] for r in results])))
-    kpis([
-        ("Estimated energy loss", f"{CTX['total']:,.0f}<span>kWh</span>", f"{CTX['total']/1000:,.1f} MWh across {len(results)} turbines"),
-        (f"{st.session_state.level} % range", f"{CTX['lo']/1000:,.0f}–{CTX['hi']/1000:,.0f}<span>MWh</span>", "Calibrated on 84 simulated outages"),
-        ("Outage duration", f"{CTX['hours']:.0f}<span>h</span>", f"{CTX['start']:%d %b %H:%M} → {CTX['end'] + pd.Timedelta(minutes=10):%d %b %H:%M}"),
-        ("Mean rebuilt wind", f"{mean_wind:.1f}<span>m/s</span>", "References " + ", ".join(sorted({x for r in results for x in r["refs"]}))),
-    ])
+    kpi_cards()
 
     with st.container(key="card_wind"):
         a1, a2 = st.columns([3, 2], vertical_alignment="center")
@@ -507,13 +651,25 @@ def page_analysis():
     with e1, st.container(key="card_eturb"):
         card_head("Lost energy per turbine", f"Whiskers show the {st.session_state.level} % range.")
         f = go.Figure()
+        top_t = max(results, key=lambda x: x["energy_kwh"])["target"]
         for r in results:
             a, b = r["range_kwh"]
-            f.add_bar(x=[r["target"]], y=[r["energy_kwh"] / 1000], marker_color=color[r["target"]], name=r["target"],
+            mc = (BLUE if r["target"] == top_t else HAIR) if present else color[r["target"]]
+            f.add_bar(x=[r["target"]], y=[r["energy_kwh"] / 1000], marker_color=mc, name=r["target"],
                       error_y=dict(type="data", symmetric=False, array=[(b - r["energy_kwh"]) / 1000], arrayminus=[(r["energy_kwh"] - a) / 1000],
                                    color=TEXT2, thickness=1.2, width=6),
                       hovertemplate="%{x}: %{y:,.1f} MWh<extra></extra>")
-        f.update_yaxes(title_text="MWh")
+        if present:
+            tot_e = sum(r["energy_kwh"] for r in results)
+            srt = sorted(results, key=lambda x: -x["energy_kwh"])
+            f = go.Figure(go.Bar(y=[r["target"] for r in srt], x=[100 * r["energy_kwh"] / tot_e for r in srt], orientation="h",
+                                 marker_color=[BLUE if r["target"] == top_t else HAIR for r in srt],
+                                 text=[f"{100 * r['energy_kwh'] / tot_e:.0f} %" for r in srt], textposition="outside",
+                                 hovertemplate="%{y}: %{x:.0f} % of the loss<extra></extra>"))
+            f.update_xaxes(range=[0, 60], title_text="share of the loss (%)")
+            f.update_yaxes(autorange="reversed", showgrid=False)
+        else:
+            f.update_yaxes(title_text="MWh")
         f.update_layout(hovermode="closest")
         chart(style(f, 320, legend=False), key="eturb_chart")
     with e2, st.container(key="card_ecum"):
@@ -534,10 +690,17 @@ def page_analysis():
         card_head("Where the loss comes from", "Lost energy by rebuilt wind speed. Below 3 m/s a turbine makes no power; above 11.5 m/s it runs at full power.")
         bt = ac.band_table(results)
         f = go.Figure()
-        for r in results:
-            d = bt[bt.turbine == r["target"]]
-            f.add_bar(x=d.band.astype(str), y=d.kwh / 1000, name=r["target"], marker_color=color[r["target"]],
-                      hovertemplate="%{x}: %{y:,.1f} MWh<extra>" + r["target"] + "</extra>")
+        if present:
+            tot = bt.groupby("band", observed=False).kwh.sum()
+            top_b = tot.idxmax()
+            f.add_bar(x=tot.index.astype(str), y=tot.values / 1000, marker_color=[BLUE if b == top_b else HAIR for b in tot.index],
+                      text=[f"{v / 1000:,.0f} MWh" if v > 0 else "" for v in tot.values], textposition="outside",
+                      hovertemplate="%{x}: %{y:,.1f} MWh<extra></extra>", showlegend=False)
+        else:
+            for r in results:
+                d = bt[bt.turbine == r["target"]]
+                f.add_bar(x=d.band.astype(str), y=d.kwh / 1000, name=r["target"], marker_color=color[r["target"]],
+                          hovertemplate="%{x}: %{y:,.1f} MWh<extra>" + r["target"] + "</extra>")
         f.update_layout(barmode="stack", hovermode="closest")
         f.update_yaxes(title_text="MWh")
         chart(style(f, 300), key="bands_chart")
@@ -783,119 +946,297 @@ def term_value(t):
     return "Found"
 
 
+def contract_source():
+    src = st.session_state.contract_src
+    if src == "Sample contract" and SAMPLE_CONTRACT.exists():
+        return SAMPLE_CONTRACT.name, SAMPLE_CONTRACT.read_bytes()
+    if src == "Upload contract" and st.session_state.contract_up:
+        return st.session_state.contract_up
+    return None, None
+
+
+def _ov(name):
+    v = st.session_state.ovs.get(name)
+    return float(v) if v else None
+
+
+def keep_ov(name):
+    st.session_state.ovs[name] = st.session_state.get(name)
+
+
+def contract_and_calc():
+    """(contract, calc, fingerprint) for the current contract choice; (None, None, '') without one."""
+    name, data = contract_source()
+    if not data or not CTX.get("ok"):
+        return None, None, ""
+    try:
+        contract = parse_contract_cached(name, data)
+    except Exception:  # noqa: BLE001
+        return None, None, ""
+    fp = hashlib.md5(data).hexdigest()[:10]
+    ov = {"rate_eur_kwh": _ov(f"ov_rate_{fp}"), "waiting_h": _ov(f"ov_wait_{fp}"), "cap_eur": _ov(f"ov_cap_{fp}"),
+          "notice_days": _ov(f"ov_notice_{fp}")}
+    rel = (RECIPE["energy"]["range_park_rel"] if len(CTX["results"]) > 1 else RECIPE["energy"]["range_turbine_rel"])[st.session_state.level]
+    calc = cl.compute_claim(CTX["results"], (CTX["start"], CTX["end"]), contract, ov, rel)
+    return contract, calc, fp + json.dumps(ov, sort_keys=True)
+
+
 def contract_card():
-    """Contract upload, the clauses found in it, and the claim amount they imply. Returns (contract, calc, no_exclusion, fp)."""
+    """Contract choice, the clauses found in it, and the claim it implies. Returns (contract, calc, no_exclusion, fingerprint)."""
     with st.container(key="card_contract"):
         card_head("Insurance contract", "The email and report cite your policy's clauses, so the claim rests on what was agreed.")
-        src = segmented("Contract", ["Sample contract", "Upload contract", "No contract"], "_contract_src", default=st.session_state.contract_src)
-        if src != st.session_state.contract_src:
-            st.session_state.contract_src = src
-            st.rerun()
-        name = data = None
+        src = segmented_bound("Contract", ["Sample contract", "Upload contract", "No contract"], "_contract_src", "contract_src")
         if src == "Sample contract" and SAMPLE_CONTRACT.exists():
-            name, data = SAMPLE_CONTRACT.name, SAMPLE_CONTRACT.read_bytes()
             st.caption("A sample business interruption policy for wind park T, with fictional parties.")
-            st.download_button("View sample contract (PDF)", data, file_name=SAMPLE_CONTRACT.name, mime="application/pdf", key="dl_sample_contract")
+            st.download_button("View sample contract (PDF)", SAMPLE_CONTRACT.read_bytes(), file_name=SAMPLE_CONTRACT.name, mime="application/pdf",
+                               key="dl_sample_contract")
         elif src == "Upload contract":
             st.file_uploader("Contract", type=["pdf", "docx", "txt", "md"], key="_contract_up", on_change=keep_contract,
                              label_visibility="collapsed", help="PDF, Word or text. Clauses should be numbered, for example 4.1.")
-            if st.session_state.contract_up:
-                name, data = st.session_state.contract_up
-        if not data:
-            if src == "No contract":
-                st.caption("The email and report will not cite any contract clauses.")
+        contract, calc, cfp = contract_and_calc()
+        if src == "Upload contract" and st.session_state.contract_up and contract is None:
+            st.markdown(f"{badge('Could not read the contract', 'orange')}", unsafe_allow_html=True)
+        if contract is None:
+            st.markdown(f"<div style='margin-top:10px'>{badge('Coverage review required', 'orange')} <span style='color:{TEXT2};font-size:13px'>"
+                        "Without a contract the email is a preliminary notification, not a claim for a specific amount.</span></div>",
+                        unsafe_allow_html=True)
             return None, None, False, ""
-        try:
-            contract = parse_contract_cached(name, data)
-        except Exception as e:  # noqa: BLE001
-            st.markdown(f"{badge('Could not read the contract', 'orange')} <span style='color:{TEXT2};font-size:13px'>{esc(e)}</span>", unsafe_allow_html=True)
-            return None, None, False, ""
-        fp = hashlib.md5(data).hexdigest()[:10]
-        pre = contract.preamble
+        fp = cfp[:10]
+        pre, T = contract.preamble, contract.terms
         st.markdown(f"<div style='margin:10px 0 6px'>{badge('Contract read', 'green')} &nbsp;<span style='color:{TEXT2};font-size:13px'>"
                     f"{esc(pre.get('policy', 'policy number not found'))} · {esc(pre.get('insurer', 'insurer not found'))} · "
                     f"{len(contract.clauses)} clauses</span></div>", unsafe_allow_html=True)
         rows = [{"Term": t.label, "Value": term_value(t), "Clause": t.clause or "—",
-                 "Contract text": (t.quote[:150] + "…") if len(t.quote) > 150 else (t.quote or "—")} for t in contract.terms.values()]
+                 "Contract text": (t.quote[:150] + "…") if len(t.quote) > 150 else (t.quote or "—")} for t in T.values()]
         st.markdown(table_html(pd.DataFrame(rows), numeric=set()), unsafe_allow_html=True)
-        T = contract.terms
         with st.expander("Adjust contract terms"):
             a1, a2, a3, a4 = st.columns(4)
-            ov = {"rate_eur_kwh": a1.number_input("Rate (EUR per kWh)", 0.0, 10.0, float(T["rate_eur_kwh"].value or 0.0), 0.001, format="%.4f", key=f"ov_rate_{fp}"),
-                  "waiting_h": a2.number_input("Waiting period (h)", 0.0, 240.0, float(T["waiting_h"].value or 0.0), 1.0, key=f"ov_wait_{fp}"),
-                  "cap_eur": a3.number_input("Limit per event (EUR)", 0.0, 1e9, float(T["cap_eur"].value or 0.0), 1000.0, key=f"ov_cap_{fp}"),
-                  "notice_days": a4.number_input("Notify within (days)", 0.0, 365.0, float(T["notice_days"].value or 0.0), 1.0, key=f"ov_notice_{fp}")}
-            ov = {k: (v if v > 0 else None) for k, v in ov.items()}
+            spec = [(a1, "ov_rate", "rate_eur_kwh", "Rate (EUR per kWh)", 10.0, 0.001, "%.4f"), (a2, "ov_wait", "waiting_h", "Waiting period (h)", 240.0, 1.0, None),
+                    (a3, "ov_cap", "cap_eur", "Limit per event (EUR)", 1e9, 1000.0, None), (a4, "ov_notice", "notice_days", "Notify within (days)", 365.0, 1.0, None)]
+            for col, pfx, term, label, mx, stp, fmt in spec:
+                k = f"{pfx}_{fp}"
+                cur = _ov(k) if _ov(k) is not None else float(T[term].value or 0.0)
+                kw = {"format": fmt} if fmt else {}
+                col.number_input(label, 0.0, mx, cur, stp, key=k, on_change=keep_ov, args=(k,), **kw)
+        nk = f"noexcl_{fp}"
         no_excl = st.checkbox("Confirm: no planned maintenance and no curtailment ordered by the grid operator during the outage"
-                              + (f" (clause {T['exclusions'].clause})" if T["exclusions"].clause else ""), key=f"noexcl_{fp}")
-        rel = RECIPE["energy"]["range_park_rel"][st.session_state.level] if len(CTX["results"]) > 1 else RECIPE["energy"]["range_turbine_rel"][st.session_state.level]
-        calc = cl.compute_claim(CTX["results"], (CTX["start"], CTX["end"]), contract, ov, rel)
-        cards = [("Claimable energy", f"{calc['claimable_kwh']:,.0f}<span>kWh</span>",
-                  f"{calc['waiting_kwh']:,.0f} kWh in the {calc['waiting_h']:g} h waiting period deducted")]
+                              + (f" (clause {T['exclusions'].clause})" if T["exclusions"].clause else ""),
+                              value=bool(st.session_state.ovs.get(nk)), key=nk, on_change=keep_ov, args=(nk,))
+        contract, calc, cfp = contract_and_calc()
+        c = lambda k: f"clause {T[k].clause}" if T.get(k) and T[k].clause else "per contract"  # noqa: E731
+        steps = [("Potential generation", f"{calc['total_kwh']:,.0f} kWh", "rebuilt for the outage"),
+                 ("Not covered", f"−{calc['waiting_kwh']:,.0f} kWh", f"{calc['waiting_h']:g} h waiting period · {c('waiting_h')}"),
+                 ("Claimable energy", f"{calc['claimable_kwh']:,.0f} kWh", f"{st.session_state.level} % range {calc['claimable_lo']:,.0f} – {calc['claimable_hi']:,.0f}")]
         if calc.get("rate"):
-            cards.append(("Claim amount", f"EUR {calc['amount']:,.0f}",
-                          f"{st.session_state.level} % range EUR {calc['amount_lo']:,.0f} – {calc['amount_hi']:,.0f}" + (" · capped" if calc.get("capped") else "")))
+            steps.append(("Proposed claim", f"EUR {calc['amount']:,.0f}",
+                          f"EUR {calc['rate']:.4f}/kWh · {c('rate_eur_kwh')}" + (" · capped" if calc.get("capped") else "") + " · subject to insurer review"))
+        st.markdown("<div class='flow'>" + "<div class='arr'>›</div>".join(
+            f"<div class='st'><div class='l'>{esc(a_)}</div><div class='v'>{esc(b_)}</div><div class='c'>{esc(c_)}</div></div>" for a_, b_, c_ in steps)
+            + "</div>", unsafe_allow_html=True)
         if calc.get("notify_by"):
-            cards.append(("Notify the insurer by", f"{calc['notify_by']:%d %b %Y}", f"{calc['notice_days']:.0f} days after the outage ended"))
-        kpis(cards)
+            st.caption(f"Notify the insurer by {calc['notify_by']:%d %B %Y} ({calc['notice_days']:.0f} days after the outage, {c('notice_days')}).")
         if calc.get("below_waiting"):
             st.warning("The outage is shorter than the waiting period, so nothing is claimable under this contract.")
-        return contract, calc, no_excl, fp + json.dumps(ov, sort_keys=True) + str(no_excl)
+        return contract, calc, no_excl, cfp + str(no_excl)
+
+
+def evidence_card(calc):
+    res, wide = CTX["results"], CTX["wide"]
+    tg = [r["target"] for r in res]
+    refs = sorted({x for r in res for x in r["refs"]})
+    te = (wide.index >= CTX["start"]) & (wide.index <= CTX["end"])
+    cov = 100 * float(wide.loc[te, "wind_speed"][refs].notna().mean().mean())
+    curve = res[0]["power_curve"]
+    cut_in = float(curve.wind_speed[curve.power > 0].min())
+    rated = float(curve.power.max())
+    n_tr = len(res[0]["train_idx"])
+    n_out = sum(len(r["timestamps"]) for r in res)
+    tm = [r["test_metrics"] for r in res if "test_metrics" in r]
+    tw = CTX["test_window"]
+    if tm and tw and len(tm) == len(res):
+        et, ep = sum(m["energy_true_kwh"] for m in tm), sum(m["energy_pred_kwh"] for m in tm)
+        val = (f"Measured {tw[0]:%d}–{tw[1]:%d %b}: wind MAE {np.mean([m['wind_mae'] for m in tm]):.2f} m/s, summed energy {100 * (ep - et) / et:+.1f} %. "
+               f"Range calibrated on 84 simulated 3-day outages.")
+    else:
+        val = f"Back-test on the training days: wind MAE {np.mean([r['inner_metrics']['wind_mae'] for r in res]):.2f} m/s."
+    prod = f"{CTX['total']:,.0f} kWh lost"
+    if calc and calc.get("rate"):
+        prod += f" → {calc['claimable_kwh']:,.0f} kWh claimable → EUR {calc['amount']:,.0f} proposed"
+    items = [
+        ("Incident", f"{CTX['start']:%d %b %Y, %H:%M} → {CTX['end'] + pd.Timedelta(minutes=10):%d %b %Y, %H:%M} · {CTX['hours']:.0f} h · "
+                     f"{', '.join(tg)} without data", "Detected"),
+        ("Operational measurements", f"{n_tr:,} ten-minute values per affected turbine from the {int(st.session_state.window_days)} days before the outage", "Used"),
+        ("Reference measurements", f"{', '.join(refs)} · {cov:.0f} % of values present during the outage", "Used"),
+        ("Reconstructed wind speed", f"{n_out:,} ten-minute values ({len(res)} turbines × {len(res[0]['timestamps'])})", "Generated"),
+        ("Power curves", f"{', '.join(tg)} · cut-in {cut_in:g} m/s · rated {rated:,.0f} kW", "Used"),
+        ("Validation", val, "Measured"),
+        ("Estimated production", prod, "Calculated"),
+    ]
+    with st.container(key="card_evidence"):
+        card_head("Evidence", "Every number in the claim traces back to these sources.")
+        st.markdown("<div class='trail'>" + "".join(
+            f"<div class='it'><div class='dot'>{i}</div><div class='tx'><b>{esc(a_)}</b><span>{esc(b_)}</span></div>"
+            f"<div class='tag'>{esc(c_)}</div></div>" for i, (a_, b_, c_) in enumerate(items, 1)) + "</div>", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------- email composer
+EXT_COLORS = {"pdf": "#e5484d", "doc": "#2f6fed", "docx": "#2f6fed", "csv": "#30a46c", "xlsx": "#30a46c", "xls": "#30a46c",
+              "zip": "#6e6e73", "html": "#7d5bd0", "txt": "#8e8e93", "json": "#8e8e93", "md": "#8e8e93"}
+MIMES = {"pdf": "application/pdf", "zip": "application/zip", "csv": "text/csv", "html": "text/html", "txt": "text/plain", "json": "application/json",
+         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "md": "text/markdown",
+         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+
+def file_icon(name):
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    col = EXT_COLORS.get(ext, "#8e8e93")
+    return (f"<svg width='26' height='32' viewBox='0 0 26 32' aria-hidden='true'><path d='M3 1h13l8 8v20a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2z' fill='{col}'/>"
+            f"<path d='M16 1v6a2 2 0 0 0 2 2h6' fill='rgba(255,255,255,.45)'/>"
+            f"<text x='12.5' y='24' font-size='7' font-weight='700' fill='#fff' text-anchor='middle' font-family='-apple-system,Arial'>{esc(ext.upper()[:4])}</text></svg>")
+
+
+def human_size(n):
+    return f"{n / 1e6:.1f} MB" if n >= 1e6 else f"{max(n / 1e3, 0.1):.0f} KB" if n >= 1e3 else f"{n} B"
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def generated_attachments(key, _contract, _calc, contract_name, _contract_bytes, park_name, policy, _summary):
+    """Files produced from the current analysis (cached per case)."""
+    res, lv = CTX["results"], st.session_state.level
+    ctxd = {k: CTX[k] for k in ("start", "end", "hours", "total", "lo", "hi", "test_window")}
+    out = []
+    try:
+        import claim_docs as cd
+        out.append(("InSite_Claim_Report.pdf", cd.report_pdf(res, ctxd, _contract, _calc, lv, park_name, (_contract.preamble.get("insurer", "") if _contract else ""),
+                                                             policy, int(st.session_state.window_days), W_LIN, W_LGBM, TRAVEL), MIMES["pdf"]))
+        if contract_name:
+            out.append((contract_name, _contract_bytes, MIMES.get(contract_name.rsplit(".", 1)[-1].lower(), "application/octet-stream")))
+        out.append(("Supporting_Evidence.zip", cd.evidence_zip(CTX["wide"], res, ctxd, _calc, contract_name, _contract_bytes, _summary), MIMES["zip"]))
+        if _calc:
+            out.append(("Claim_Calculation.csv", cd.calculation_csv(_calc, res), MIMES["csv"]))
+    except ImportError:
+        chtml = cl.report_section_html(_contract, _calc, lv, esc) if _contract else ""
+        out.append(("InSite_Claim_Report.html", report_html(res, park_name, "", policy, chtml).encode(), MIMES["html"]))
+        if contract_name:
+            out.append((contract_name, _contract_bytes, MIMES.get(contract_name.rsplit(".", 1)[-1].lower(), "application/octet-stream")))
+        out.append(("Reconstructed_Wind.csv", ac.results_table(res).to_csv(index=False).encode(), MIMES["csv"]))
+    return out
+
+
+def rm_att(name):
+    extras = st.session_state.att_extra
+    if any(n == name for n, _, _ in extras):
+        st.session_state.att_extra = [x for x in extras if x[0] != name]
+    else:
+        st.session_state.att_removed = st.session_state.att_removed + [name]
+
+
+def add_att(key):
+    for f in st.session_state.get(key) or []:
+        ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
+        st.session_state.att_extra = [x for x in st.session_state.att_extra if x[0] != f.name] + [(f.name, f.getvalue(), MIMES.get(ext, "application/octet-stream"))]
+        st.session_state.att_removed = [n for n in st.session_state.att_removed if n != f.name]
+    st.session_state.att_n += 1  # fresh uploader next run
+
+
+def build_eml(to, cc, subject, body, atts):
+    m = EmailMessage()
+    if to:
+        m["To"] = to
+    if cc:
+        m["Cc"] = cc
+    m["Subject"] = subject
+    m["X-Unsent"] = "1"  # opens as a draft in Outlook and Apple Mail
+    m.set_content(body)
+    for name, data, mime in atts:
+        maintype, subtype = (mime or "application/octet-stream").split("/", 1)
+        m.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+    return m.as_bytes()
+
+
+def build_zip(subject, body, atts):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("email.txt", f"Subject: {subject}\n\n{body}")
+        for name, data, _ in atts:
+            z.writestr(name, data)
+    return buf.getvalue()
+
+
+def composer_card(contract, calc, no_excl, cfp):
+    res, lv = CTX["results"], st.session_state.level
+    park_name = f"Wind park {'/'.join(sorted({park_of(t) for t in CTX['targets']}))}"
+    pre = contract.preamble if contract else {}
+    refs = sorted({x for r in res for x in r["refs"]})
+    sender = "Wind Operations Team"
+    if contract:
+        text = cl.claim_email(res, (CTX["start"], CTX["end"]), contract, calc, lv, park_name, pre.get("insurer", ""), sender, no_excl, refs,
+                              int(st.session_state.window_days))
+    else:
+        text = ac.email_text(res, (CTX["start"], CTX["end"]), lv, park_name, "", "", sender, st.session_state.density)
+        text = text.replace("Subject: Business interruption claim", "Subject: Preliminary notification of a business interruption")
+    first, _, body = text.partition("\n")
+    subject = first.removeprefix("Subject: ").strip()
+    body = body.lstrip("\n")
+    summary = {"outage_start": str(CTX["start"]), "outage_end": str(CTX["end"] + pd.Timedelta(minutes=10)), "level_pct": lv,
+               "air_density": bool(st.session_state.density), "total_kwh": CTX["total"], "range_kwh": [CTX["lo"], CTX["hi"]],
+               "turbines": {r["target"]: {"energy_kwh": r["energy_kwh"], "range_kwh": list(r["range_kwh"]), "references": r["refs"],
+                                          **({"test_metrics": r["test_metrics"]} if "test_metrics" in r else {})} for r in res}}
+    if calc:
+        summary["claim"] = {k: (str(v) if isinstance(v, pd.Timestamp) else v) for k, v in calc.items()}
+        summary["claim"]["policy"] = pre.get("policy")
+    cname, cbytes = contract_source() if contract else (None, None)
+    with st.spinner("Preparing attachments…"):
+        gen = generated_attachments(CTX["key"] + cfp, contract, calc, cname, cbytes, park_name, pre.get("policy", ""), summary)
+    atts = [a for a in gen if a[0] not in st.session_state.att_removed] + list(st.session_state.att_extra)
+    h = hashlib.md5(text.encode()).hexdigest()[:8]
+    with st.container(key="card_composer"):
+        t1, t2 = st.columns([4, 1], vertical_alignment="center")
+        t1.markdown("<div class='ctitle' style='font-size:22px'>Prepare Insurance Claim</div>"
+                    "<div class='csub'>Review and edit. InSite Claim never sends email itself.</div>", unsafe_allow_html=True)
+        t2.markdown(f"<div style='text-align:right'>{badge('Draft', 'blue')}</div>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        to = c1.text_input("To", placeholder="claims@your-insurer.example", key="mail_to")
+        cc = c2.text_input("Cc", placeholder="Optional", key="mail_cc")
+        subj = st.text_input("Subject", value=subject, key=f"mail_subj_{h}")
+        msg = st.text_area("Message", value=body, height=330, key=f"mail_body_{h}")
+        st.markdown(f"<div class='atth'>Attachments ({len(atts)})</div>", unsafe_allow_html=True)
+        for i, (name, data, mime) in enumerate(atts):
+            with st.container(key=f"att_row_{i}"):
+                a1, a2, a3, a4, a5 = st.columns([0.45, 7, 1.4, 0.55, 0.55], vertical_alignment="center", gap="small")
+                a1.markdown(file_icon(name), unsafe_allow_html=True)
+                a2.markdown(f"<div class='attn'>{esc(name)}</div>", unsafe_allow_html=True)
+                a3.markdown(f"<div class='atts'>{human_size(len(data))}</div>", unsafe_allow_html=True)
+                a4.download_button("↓", data, file_name=name, mime=mime, key=f"att_dl_{i}_{name}", type="tertiary", help=f"Download {name}")
+                a5.button("×", key=f"att_rm_{i}_{name}", type="tertiary", on_click=rm_att, args=(name,), help="Remove attachment")
+        ak = f"_att_add_{st.session_state.att_n}"
+        st.file_uploader("Add attachment", accept_multiple_files=True, key=ak, on_change=add_att, args=(ak,), label_visibility="collapsed")
+        if st.session_state.att_removed:
+            st.button("Restore generated attachments", key="att_restore", type="tertiary",
+                      on_click=lambda: st.session_state.update(att_removed=[]))
+        b1, b2, b3 = st.columns([1.1, 1.1, 2], vertical_alignment="center")
+        mailto = f"mailto:{quote(to)}?subject={quote(subj)}&body={quote(msg[:1800])}" + (f"&cc={quote(cc)}" if cc else "")
+        b1.link_button("Open in Mail", mailto, width="stretch", help="Opens your mail app with the text. Attach the files from the draft package.")
+        b2.download_button("All files (.zip)", lambda: build_zip(subj, msg, atts), file_name="insite_claim_package.zip", mime="application/zip",
+                           key="dl_pkg", width="stretch")
+        b3.download_button("Prepare claim email →", lambda: build_eml(to, cc, subj, msg, atts), file_name="insite_claim_draft.eml",
+                           mime="message/rfc822", type="primary", key="dl_eml", width="stretch")
+        st.caption("The .eml draft opens in Mail or Outlook with every attachment in place, ready for you to review and send."
+                   + ("" if contract else " Without a contract this is a preliminary notification, not a claim for a specific amount."))
 
 
 def page_report():
-    section("Claim report", "Everything the insurer needs, ready to send.")
+    section("Claim report", "Evidence, policy and a ready-to-send claim.")
     if not need_results("report"):
         return
     results = CTX["results"]
+    evidence_card(contract_and_calc()[1])
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     contract, calc, no_excl, cfp = contract_card()
-    pre = contract.preamble if contract else {}
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-    with st.container(key="card_details"):
-        card_head("Claim details", "These appear in the email and the report.")
-        c1, c2 = st.columns(2)
-        park_name = c1.text_input("Wind park name", value=f"Wind park {'/'.join(sorted({park_of(t) for t in CTX['targets']}))}", key="park_name")
-        insurer = c2.text_input("Addressee", value=pre.get("insurer", ""), placeholder="Claims department", key=f"insurer_{cfp[:10]}")
-        policy = c1.text_input("Policy number", value=pre.get("policy", ""), placeholder="Optional", key=f"policy_{cfp[:10]}")
-        sender = c2.text_input("Your name", placeholder="Optional", key="sender")
-
+    composer_card(contract, calc, no_excl, cfp)
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-    r1, r2 = st.columns([1.2, 1], gap="medium")
     table = ac.results_table(results)
-    with r1, st.container(key="card_email"):
-        card_head("Insurance email", "Edit freely before sending.")
-        if contract:
-            if policy:
-                contract.preamble["policy"] = policy
-            refs = sorted({x for r in results for x in r["refs"]})
-            text = cl.claim_email(results, (CTX["start"], CTX["end"]), contract, calc, st.session_state.level, park_name, insurer,
-                                  sender, no_excl, refs, int(st.session_state.window_days))
-        else:
-            text = ac.email_text(results, (CTX["start"], CTX["end"]), st.session_state.level, park_name, insurer, policy, sender, st.session_state.density)
-        edited = st.text_area("Email", value=text, height=460, label_visibility="collapsed", key=f"email_{hashlib.md5(text.encode()).hexdigest()[:8]}")
-        st.download_button("Download email", edited, file_name="insite_claim_email.txt", mime="text/plain", key="dl_email")
-    with r2, st.container(key="card_downloads"):
-        card_head("Claim report", "A one-page report with figures, charts, accuracy and method. Open it in a browser and choose Print › Save as PDF.")
-        with st.spinner("Preparing the report…"):
-            chtml = cl.report_section_html(contract, calc, st.session_state.level, esc) if contract else ""
-            report = report_cached(CTX["key"] + cfp, results, park_name, insurer, policy, chtml)
-        st.download_button("Download claim report", report, file_name="insite_claim_report.html",
-                           mime="text/html", type="primary", key="dl_report", width="stretch")
-        st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
-        card_head("Data", f"{len(table):,} rows · every 10-minute step for each affected turbine.")
-        st.download_button("Predicted time series (CSV)", table.to_csv(index=False), file_name="insite_claim_timeseries.csv", mime="text/csv",
-                           key="dl_csv", width="stretch")
-        summary = {"outage_start": str(CTX["start"]), "outage_end": str(CTX["end"]), "level_pct": st.session_state.level,
-                   "air_density": bool(st.session_state.density), "total_kwh": CTX["total"], "range_kwh": [CTX["lo"], CTX["hi"]],
-                   "turbines": {r["target"]: {"energy_kwh": r["energy_kwh"], "range_kwh": list(r["range_kwh"]), "references": r["refs"],
-                                              **({"test_metrics": r["test_metrics"]} if "test_metrics" in r else {})} for r in results}}
-        if calc:
-            summary["claim"] = {k: (str(v) if isinstance(v, pd.Timestamp) else v) for k, v in calc.items()}
-            summary["claim"]["policy"] = contract.preamble.get("policy")
-        st.download_button("Summary (JSON)", json.dumps(summary, indent=2, default=float), file_name="insite_claim_summary.json",
-                           mime="application/json", key="dl_json", width="stretch")
-
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     with st.container(key="card_series"):
         n_per = table.groupby("turbine").size()
         card_head("Predicted time series", f"{', '.join(f'{t}: {n} rows' for t, n in n_per.items())}. Scroll inside the table to see every row.")
@@ -907,6 +1248,339 @@ def page_report():
                                     "energy_kwh": st.column_config.NumberColumn("Energy (kWh)", format="%.1f")})
 
 
+
+# ------------------------------------------------------------------ presentation mode
+STAGE_SUBS = {6: 3, 7: 2}
+KEEP_KEYS = ["pz_ui", "pz_uic", "pz_exit", "pz_cap", "pz_float", "pz_cine", "pz_load", "pz_tech"]
+
+
+def pres_go(stage, sub=0):
+    st.session_state.stage, st.session_state.sub, st.session_state.stage_t = stage, sub, time.time()
+
+
+def pres_next():
+    s_, k = st.session_state.stage, st.session_state.sub
+    if k + 1 < STAGE_SUBS.get(s_, 1):
+        pres_go(s_, k + 1)
+    elif s_ < 8:
+        pres_go(s_ + 1)
+
+
+def pres_back():
+    s_, k = st.session_state.stage, st.session_state.sub
+    if k > 0:
+        pres_go(s_, k - 1)
+    elif s_ == 5:
+        pres_go(3)
+    elif s_ > 1:
+        pres_go(s_ - 1, STAGE_SUBS.get(s_ - 1, 1) - 1)
+
+
+def pres_exit(page="Overview"):
+    st.session_state["_pres_exit"] = page
+
+
+def keep_p(state_key, widget_key):
+    v = st.session_state.get(widget_key)
+    if v is not None and v != []:
+        st.session_state[state_key] = v
+
+
+def on_park_p():
+    v = st.session_state.get("_p_park")
+    if not v:
+        return
+    st.session_state.park = v
+    members = st.session_state.get("_park_members", {}).get(v)
+    if members:
+        st.session_state.targets = members
+
+
+def keep_contract_p():
+    f = st.session_state.get("_p_contract_up")
+    st.session_state.contract_up = (f.name, f.getvalue()) if f is not None else None
+
+
+def keep_uploads_p(kind):
+    files = st.session_state.get("_p_up_" + kind) or []
+    st.session_state["uploads_" + kind] = tuple((f.name, f.getvalue()) for f in files)
+
+
+def silhouettes(fill, rotor_fill, op_far=.35):
+    def t(x, y, s, cls, op):
+        bl = "".join(f'<path d="M0,0 L-3,-5 L0,-120 L3,-5 Z" transform="rotate({a})" fill="{rotor_fill}"/>' for a in (0, 120, 240))
+        return (f'<g transform="translate({x},{y}) scale({s})" opacity="{op}"><path d="M-5,0 L-2.5,330 L2.5,330 L5,0 Z" fill="{fill}"/>'
+                f'<g class="rotor {cls}">{bl}<circle r="6" fill="{fill}"/></g></g>')
+    return ('<svg class="sil" viewBox="0 0 1600 600" preserveAspectRatio="xMidYMax slice" aria-hidden="true">'
+            + t(1330, 170, 1.35, "", 1) + t(380, 300, .8, "s2", op_far + .2) + t(150, 360, .55, "s3", op_far) + t(1450, 330, .6, "s2", op_far)
+            + t(860, 360, .45, "s3", op_far - .1) + '</svg>')
+
+
+def pz_nav(center=False):
+    s_, k = st.session_state.stage, st.session_state.sub
+    subs = STAGE_SUBS.get(s_, 1)
+    dots = "".join(f"<i class='{'on' if j == k else ''}'></i>" for j in range(subs)) if subs > 1 else ""
+    prog = f"<div class='pzprog'>{s_:02d} / 08{('<span>' + dots + '</span>') if dots else ''}</div>"
+    with st.container(key="pz_uic" if center else "pz_ui", horizontal=True, gap="small"):
+        if not center and (s_ > 1 or k > 0):
+            st.button("← Back", key="pz_back", type="tertiary", on_click=pres_back)
+        st.markdown(prog, unsafe_allow_html=True)
+        if s_ == 8:
+            st.button("Restart", key="pz_restart", on_click=pres_go, args=(1,))
+            st.button("Finish", key="pz_finish", type="primary", on_click=pres_exit, args=("Claim report",))
+        elif s_ not in (3, 4):
+            st.button("Next →", key="pz_next", type="primary", on_click=pres_next)
+    with st.container(key="pz_exit", horizontal=True, gap="small"):
+        st.html("<button class='pzfs' onclick=\"document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()\">Full screen</button>",
+                unsafe_allow_javascript=True)
+        st.button("Exit", key="pz_exitbtn", type="tertiary", on_click=pres_exit)
+
+
+def pz_caption(html_text):
+    with st.container(key="pz_cap"):
+        st.markdown(f"<div class='pzcap'>{html_text}</div>", unsafe_allow_html=True)
+
+
+def spotlight(target):
+    t = target or "pz_none"
+    keep = "".join(f":not(.st-key-{k} *)" for k in KEEP_KEYS)
+    focus = (f".stMain .st-key-{t} {{ position:relative; z-index:20; transform:scale(1.03); }} .st-key-{t} .kpi {{ box-shadow:0 24px 60px rgba(16,24,40,.16); }}"
+             if t == "kpiwrap" else
+             f".stMain .st-key-{t} {{ position:relative; z-index:20; transform:scale(1.02); box-shadow:0 30px 80px rgba(16,24,40,.18), 0 0 0 2px rgba(0,113,227,.35) !important; }}")
+    st.html(f"""<style>
+.stApp {{ background: linear-gradient(180deg,#eef1f6,#e4e8ef) !important; }}
+[data-testid="stSpinner"] {{ display:none !important; }}
+.stMain div[class*="st-key-card"], .stMain .st-key-kpiwrap {{ transition: opacity .45s ease, filter .45s ease, transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .5s ease; }}
+.stMain div[class*="st-key-card"]:not(.st-key-{t}), .stMain .st-key-kpiwrap:not(.st-key-{t}) {{ opacity:.22; filter:blur(4px) saturate(.7); pointer-events:none; }}
+.stMain [data-testid="stElementContainer"]:not(div[class*="st-key-card"] *):not(.st-key-kpiwrap *):not(.st-key-{t} *){keep} {{ opacity:.22; filter:blur(4px); }}
+{focus}
+</style>""")
+
+
+def pz_scroll(target):
+    token = f"{st.session_state.stage}.{st.session_state.sub}.{target}"
+    st.html(f"""<script>/* {token} */
+(function(){{
+  if (!window.__insiteKeys) {{
+    window.__insiteKeys = true;
+    document.addEventListener('keydown', function(e) {{
+      const a = document.activeElement; if (a && ['INPUT','TEXTAREA','SELECT'].includes(a.tagName)) return;
+      const btns = Array.from(document.querySelectorAll('.st-key-pz_ui button, .st-key-pz_uic button, .st-key-pz_exit button, .st-key-pz_float button'));
+      const hit = (labels) => {{ const b = btns.find(x => labels.includes(x.innerText.trim())); if (b) {{ b.click(); e.preventDefault(); }} }};
+      if (e.key === 'ArrowRight') hit(['Next →', 'Analyze →', 'Finish']);
+      else if (e.key === 'ArrowLeft') hit(['← Back']);
+      else if (e.key === 'Escape') hit(['Exit']);
+    }});
+  }}
+  const sel = {json.dumps('.st-key-' + target) if target else 'null'};
+  if (!sel) {{ window.scrollTo({{top: 0, behavior: 'smooth'}}); return; }}
+  let n = 0;
+  const go = () => {{ const el = document.querySelector(sel); if (el) {{ el.scrollIntoView({{behavior: 'smooth', block: 'center'}}); }} else if (n++ < 50) setTimeout(go, 100); }};
+  setTimeout(go, 250);
+}})();
+</script>""", unsafe_allow_javascript=True)
+
+
+def backdrop():
+    st.markdown("<div class='hero'><div class='eyebrow'>Outage energy assessment</div><h1>InSite Claim</h1>"
+                "<p>Know what a wind park lost while it was offline.</p></div>", unsafe_allow_html=True)
+    farms = portfolio()
+    st.markdown("<div class='tiles' style='margin-top:40px'>" + "".join(
+        f"<div class='tile'><div class='n'>{esc(f['name'])}</div><div class='m'>{esc(f['country'])}</div>{badge('No data connected', 'gray')}</div>"
+        for f in farms[:12]) + "</div>", unsafe_allow_html=True)
+
+
+def stage_cinema(n):
+    if n == 1:
+        body = "<h1>How much is<br>missing wind data<br><b>really worth?</b></h1>"
+        sil = silhouettes("#11161d", "#11161d", .3)
+        cls = "pz1"
+    else:
+        body = ("<h1>Calculate it. Prove it. <b>Claim it.</b></h1>"
+                "<p>InSite Claim — from missing data to defensible claims.</p>")
+        sil = silhouettes("#3d4652", "#3d4652", .35)
+        cls = "pz2"
+    with st.container(key="pz_cine"):
+        st.markdown(f"<div class='pzc {cls}'>{sil}<div style='position:relative;z-index:2;margin-top:-6vh'>{body}</div></div>", unsafe_allow_html=True)
+    backdrop()
+    pz_nav(center=True)
+    pz_scroll(None)
+
+
+ICONS = {
+    "turbine": "<path d='M12 13v8'/><path d='M12 11 6 4'/><path d='m12 11 7-2'/><path d='m12 11-1 7'/><circle cx='12' cy='11' r='1.6'/>",
+    "doc": "<path d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/><path d='M14 3v5h5'/><path d='M9 13h6M9 17h4'/>",
+    "ref": "<circle cx='6' cy='12' r='2.5'/><circle cx='18' cy='6' r='2.5'/><circle cx='18' cy='18' r='2.5'/><path d='M8.3 11 15.7 7M8.3 13l7.4 4'/>",
+    "shield": "<path d='M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z'/><path d='m9 12 2 2 4-4'/>",
+}
+
+
+def pzrow(key, icon, label):
+    c = st.container(key=key)
+    a, b = c.columns([0.11, 1], vertical_alignment="center")
+    a.markdown(f"<div class='pzic'><svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='#1d1d1f' stroke-width='1.7' "
+               f"stroke-linecap='round' stroke-linejoin='round'>{ICONS[icon]}</svg></div>", unsafe_allow_html=True)
+    b.markdown(f"<div class='pzrl'>{esc(label)}</div>", unsafe_allow_html=True)
+    return b
+
+
+def stage_inputs():
+    backdrop()
+    with st.container(key="pz_float"):
+        st.markdown("<div class='eyebrow' style='color:#0071e3'>InSite Claim</div><div class='pzh'>Select the turbine. Upload the evidence.</div>"
+                    "<div class='pzs'>Everything below is the live product. Change anything, then analyse.</div>", unsafe_allow_html=True)
+        turbines = CTX.get("turbines") or []
+        parks = sorted({park_of(t) for t in turbines})
+        members = {f"Wind park {p}": [t for t in turbines if park_of(t) == p] for p in parks}
+        st.session_state["_park_members"] = members
+        farms = portfolio()
+        options = list(members) + [f"{f['name']} · {f['country']}" for f in farms]
+        tparks = {park_of(t) for t in (CTX.get("targets") or (CTX.get("det") or {}).get("targets", []))}
+        default = next((f"Wind park {p}" for p in tparks), options[0] if options else None)
+        if st.session_state.park not in options:
+            st.session_state.park = default
+        b = pzrow("pz_r1", "turbine", "Wind farm and turbines")
+        c1, c2 = b.columns([1, 1.2])
+        if options:
+            c1.selectbox("Wind farm", options, index=options.index(st.session_state.park), key="_p_park", on_change=on_park_p, label_visibility="collapsed")
+        sel = st.session_state.park
+        has_data = sel in members
+        if has_data:
+            opts = members[sel]
+            cur = [t for t in (CTX.get("targets") or []) if t in opts] or opts
+            c2.multiselect("Turbines", opts, default=cur, key="_p_targets", on_change=keep_p, args=("targets", "_p_targets"), label_visibility="collapsed")
+        else:
+            c2.markdown(f"<div style='padding-top:8px'>{badge('No data connected', 'gray')}</div>", unsafe_allow_html=True)
+        b = pzrow("pz_r2", "doc", "Operational data")
+        with b:
+            segmented_bound("Source", ["Example dataset", "Upload files"], "_p_source", "source", fmt=lambda x: "Hackathon sample data" if x == "Example dataset" else x)
+        if st.session_state.source == "Upload files":
+            u1, u2 = b.columns(2)
+            u1.file_uploader("Wind data (all turbines)", type=["csv", "xlsx"], accept_multiple_files=True, key="_p_up_w", on_change=keep_uploads_p, args=("w",))
+            u2.file_uploader("Power curves", type=["csv", "xlsx"], accept_multiple_files=True, key="_p_up_c", on_change=keep_uploads_p, args=("c",))
+        tg = CTX.get("targets") or []
+        if turbines:
+            b.caption(f"Measurements for {', '.join(tg) or '—'} (affected) and {len([t for t in turbines if park_of(t) not in {park_of(x) for x in tg}])} reference turbines"
+                      + (" · clearly labelled sample data" if st.session_state.source == "Example dataset" else ""))
+        b = pzrow("pz_r3", "ref", "Reference wind farms")
+        refparks = [p for p in parks if p not in {park_of(x) for x in tg}]
+        b.markdown(" &nbsp;".join(badge(f"Wind park {p} · {len(members[f'Wind park {p}'])} turbines", "blue") for p in refparks)
+                   + f" <span style='color:{TEXT2};font-size:13px'>&nbsp;best five picked automatically by correlation</span>", unsafe_allow_html=True)
+        b = pzrow("pz_r4", "shield", "Insurance contract")
+        with b:
+            segmented_bound("Contract", ["Sample contract", "Upload contract", "No contract"], "_p_contract_src", "contract_src")
+        if st.session_state.contract_src == "Upload contract":
+            b.file_uploader("Contract", type=["pdf", "docx", "txt", "md"], key="_p_contract_up", on_change=keep_contract_p, label_visibility="collapsed")
+        cname, cdata = contract_source()
+        if cdata:
+            b.markdown(f"<div style='display:flex;gap:10px;align-items:center;margin-top:6px'>{file_icon(cname)}<span style='font-size:14px'>{esc(cname)}</span>"
+                       f"<span style='color:{TEXT3};font-size:13px'>{human_size(len(cdata))}</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        ok = has_data and bool(CTX.get("wide") is not None)
+        st.button("Analyze →", key="pz_analyze", type="primary", width="stretch", on_click=pres_go, args=(4,), disabled=not ok)
+        if not ok:
+            st.caption(CTX.get("msg", ("", "Choose a wind farm with data."))[1] if CTX.get("msg") else "Choose a wind farm with connected data to analyse.")
+    pz_nav()
+    pz_scroll(None)
+
+
+def stage_loading():
+    backdrop()
+    with st.container(key="pz_load"):
+        st.markdown("""<div class='pzl'><div class='pzring'><svg width='132' height='132' viewBox='0 0 132 132'>
+<circle cx='66' cy='66' r='54' fill='none' stroke='#eef0f4' stroke-width='10'/>
+<circle class='arc' cx='66' cy='66' r='54' fill='none' stroke='#0071e3' stroke-width='10' stroke-linecap='round'/></svg><div class='num'></div></div>
+<b>Analyzing loss potential…</b><div class='pzrot'><span>Reconstructing missing wind speeds</span><span>Estimating potential production</span>
+<span>Preparing the evidence package</span></div></div>""", unsafe_allow_html=True)
+    t0 = st.session_state.stage_t or time.time()
+    build_context()
+    left = 2.4 - (time.time() - t0)
+    if left > 0:
+        time.sleep(left)
+    if CTX.get("ok"):
+        pres_go(5)
+        st.rerun()
+    with st.container(key="pz_float"):
+        t_, m_ = CTX.get("msg", ("The analysis could not run", "Check the data and try again."))
+        st.markdown(f"<div class='pzh'>{esc(t_)}</div><div class='pzs'>{esc(m_)}</div>", unsafe_allow_html=True)
+        st.button("Back to inputs", key="pz_retry", type="primary", on_click=pres_go, args=(3,))
+
+
+def stage_tech():
+    bars = [("Time shifts", -17, BLUE), ("Rolling averages", -14, BLUE), ("Wind direction", -14, BLUE), ("Turbulence", -2, BLUE),
+            ("Hour of day", 1, ORANGE), ("Air pressure", 2, ORANGE), ("Temperature", 5, ORANGE)]
+    rows = "".join(f"<div class='pzbar'><div>{esc(n)}</div><div class='tr'><div class='fl' style='width:{abs(v) / 17 * 100:.0f}%;background:{c}'></div></div>"
+                   f"<div class='vv'>{v:+d} kW</div></div>" for n, v, c in bars)
+    steps = [("5 reference turbines", "other parks, ranked by correlation over the training days"),
+             ("Wind in time", "now, ±10–60 min" + (", plus a travel time learned per wind direction" if TRAVEL else "")),
+             (f"{W_LIN} % linear + {W_LGBM} % trees", "ridge regression and LightGBM, trained on the 30 days before the outage"),
+             ("Power curve over the wobble", "averages over the real spread of wind, fixing a 10 % under-count")]
+    st_html = "".join(f"<div class='pzstep'><div class='n'>{i}</div><div><b>{esc(a)}</b><span>{esc(b)}</span></div></div>" for i, (a, b) in enumerate(steps, 1))
+    with st.container(key="pz_float"):
+        st.markdown("<div class='pzh'>How the wind is rebuilt — and how we chose it</div>"
+                    "<div class='pzs'>Staged grid search: 65,000+ models, each tested on 84 simulated 3-day outages.</div>"
+                    f"<div class='pztech'><div class='col'><h3>The model</h3>{st_html}</div>"
+                    f"<div class='col'><h3>What mattered</h3>{rows}<div class='pzsmall'>Change in power error when a feature group is added. "
+                    "Wind travels between parks and the link depends on direction. Temperature hurt, so it is used for air density instead.</div></div></div>",
+                    unsafe_allow_html=True)
+
+
+def page_present():
+    if "_pres_exit" in st.session_state:
+        st.switch_page(PAGES[st.session_state.pop("_pres_exit")])
+    s_, k = st.session_state.stage, st.session_state.sub
+    if s_ in (1, 2):
+        stage_cinema(s_)
+        return
+    if s_ == 3:
+        spotlight(None)
+        stage_inputs()
+        return
+    if s_ == 4:
+        spotlight(None)
+        stage_loading()
+        return
+    if not CTX.get("ok"):
+        pres_go(3)
+        st.rerun()
+    res = CTX["results"]
+    if s_ in (5, 6):
+        target, cap = None, ""
+        if s_ == 5:
+            target, cap = "kpiwrap", "Here’s the estimated loss <b>and its claim value.</b>"
+        elif k == 0:
+            bt = ac.band_table(res)
+            tot = bt.groupby("band", observed=False).kwh.sum()
+            top = str(tot.idxmax())
+            target, cap = "card_bands", f"Highest estimated loss at <b>{esc(top)}</b> · {100 * tot.max() / tot.sum():.0f} % of the total"
+        elif k == 1:
+            top = max(res, key=lambda r: r["energy_kwh"])
+            share = 100 * top["energy_kwh"] / sum(r["energy_kwh"] for r in res)
+            target, cap = "card_eturb", f"Turbine <b>{esc(top['target'])}</b> most affected · {share:.0f} % of the loss"
+        else:
+            cap = "Reconstructed from reference parks, <b>chosen by evidence.</b>"
+        spotlight(target)
+        if k == 2 and s_ == 6:
+            stage_tech()
+        pz_caption(cap)
+        page_analysis(present=True)
+    else:
+        if s_ == 7 and k == 0:
+            target, cap = "card_evidence", "Every result is backed by <b>traceable evidence.</b>"
+        elif s_ == 7:
+            contract, _, _ = contract_and_calc()
+            n = sum(1 for t in contract.terms.values() if t.clause) if contract else 0
+            target = "card_contract"
+            cap = f"Policy clauses identified · <b>{n} terms</b> matched to the claim" if contract else "Coverage review required · <b>no contract attached</b>"
+        else:
+            target, cap = "card_composer", "From missing data to <b>a defensible claim.</b>"
+        spotlight(target)
+        pz_caption(cap)
+        page_report()
+    pz_nav()
+    pz_scroll(target)
+
+
 # ------------------------------------------------------------------ app shell
 PAGES = {
     "Overview": st.Page(page_overview, title="Overview", url_path="overview", default=True),
@@ -914,25 +1588,37 @@ PAGES = {
     "Accuracy": st.Page(page_accuracy, title="Accuracy", url_path="accuracy"),
     "Method": st.Page(page_method, title="Method", url_path="method"),
     "Claim report": st.Page(page_report, title="Claim report", url_path="report"),
+    "Present": st.Page(page_present, title="Present", url_path="present"),
 }
+NAV = [k for k in PAGES if k != "Present"]
 pg = st.navigation(list(PAGES.values()), position="hidden")
 st.html(CSS)
+st.html(CSS2)
+
+
+def start_presentation():
+    pres_go(1)
+    st.session_state["_goto"] = "Present"
 
 
 def on_nav():
     st.session_state["_goto"] = st.session_state.get("nav")
 
 
-with st.container(key="navbar"):
-    n1, n2 = st.columns([1, 2.6], vertical_alignment="center")
-    n1.markdown(f"<div class='brand'>{LOGO}{APP_NAME}</div>", unsafe_allow_html=True)
-    with n2:
-        goto = st.session_state.pop("_goto", None)
-        if not goto:
-            st.session_state["nav"] = pg.title
-        st.segmented_control("Navigation", list(PAGES), key="nav", on_change=on_nav, label_visibility="collapsed")
+goto = st.session_state.pop("_goto", None)
 if goto and goto != pg.title and goto in PAGES:
     st.switch_page(PAGES[goto])
-
-build_context()
-pg.run()
+if pg.title == "Present":
+    if st.session_state.stage != 4:
+        build_context()
+    pg.run()
+else:
+    with st.container(key="navbar"):
+        n1, n2, n3 = st.columns([1, 2.6, 0.5], vertical_alignment="center")
+        n1.markdown(f"<div class='brand'>{LOGO}{APP_NAME}</div>", unsafe_allow_html=True)
+        with n2:
+            st.session_state["nav"] = pg.title
+            st.segmented_control("Navigation", NAV, key="nav", on_change=on_nav, label_visibility="collapsed")
+        n3.button("Present", key="present_btn", type="primary", on_click=start_presentation, width="stretch")
+    build_context()
+    pg.run()
