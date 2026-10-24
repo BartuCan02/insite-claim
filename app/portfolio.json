@@ -1,0 +1,182 @@
+[
+ {
+  "name": "Amadeus Wind",
+  "country": "United States",
+  "capacity_mw": 250,
+  "turbines": 96,
+  "relationship": "Co-owns and operates",
+  "status": "operating",
+  "evidence_url": "https://us.baywa-re.com/en/projects/ipp-projects/amadeus"
+ },
+ {
+  "name": "Strauss Wind Farm",
+  "country": "United States",
+  "capacity_mw": 95,
+  "turbines": 27,
+  "relationship": "Owns and operates",
+  "status": "operating",
+  "evidence_url": "https://us.baywa-re.com/en/americas-cases/strauss-wind"
+ },
+ {
+  "name": "Mozart Wind Farm",
+  "country": "United States",
+  "capacity_mw": 30,
+  "turbines": 12,
+  "relationship": "Owns and operates",
+  "status": "operating",
+  "evidence_url": "https://us.baywa-re.com/en/projects/ipp-projects/mozart"
+ },
+ {
+  "name": "Chopin Wind Farm",
+  "country": "United States",
+  "capacity_mw": 10,
+  "turbines": 6,
+  "relationship": "Owns and operates",
+  "status": "operating",
+  "evidence_url": "https://us.baywa-re.com/en/projects/ipp-projects/chopin"
+ },
+ {
+  "name": "Schumann Wind Farm",
+  "country": "United States",
+  "capacity_mw": 8,
+  "turbines": 5,
+  "relationship": "Owns and operates",
+  "status": "operating",
+  "evidence_url": "https://us.baywa-re.com/en/projects/ipp-projects/schumann"
+ },
+ {
+  "name": "Beethoven",
+  "country": "United States",
+  "capacity_mw": 80,
+  "turbines": 43,
+  "relationship": "Developed, now manages",
+  "status": "operating",
+  "evidence_url": "https://www.windpowerengineering.com/northwestern-energy-to-purchase-south-dakota-wind-project-from-baywa-r-e-wind/"
+ },
+ {
+  "name": "Lyngsåsa",
+  "country": "Sweden",
+  "capacity_mw": 94.6,
+  "turbines": 22,
+  "relationship": "Developed, now manages",
+  "status": "operating",
+  "evidence_url": "https://nordic.baywa-re.com/en/local-projects/commissioned-projects/lyngsasa-i"
+ },
+ {
+  "name": "Furuby",
+  "country": "Sweden",
+  "capacity_mw": 62,
+  "turbines": 10,
+  "relationship": "Developed, now manages",
+  "status": "operating",
+  "evidence_url": "https://nordic.baywa-re.com/fi/news/baywa-re-sells-62-mw-swedish-wind-farm-to-erg"
+ },
+ {
+  "name": "Obernwohlde",
+  "country": "Germany",
+  "capacity_mw": 61,
+  "turbines": 20,
+  "relationship": "Developed, now operates",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.de/en/references/selected-completed-projects/obernwohlde"
+ },
+ {
+  "name": "Dalquhandy Wind Farm",
+  "country": "United Kingdom",
+  "capacity_mw": 42,
+  "turbines": 10,
+  "relationship": "Developed, now manages",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.com/en/news/baywa-r-e-sells-42-mw-dalquhandy-wind-farm-to-greencoat"
+ },
+ {
+  "name": "Grande Lande",
+  "country": "France",
+  "capacity_mw": 13.2,
+  "turbines": 6,
+  "relationship": "Developed, now manages",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.fr/en/parks-in-france/grande-lande"
+ },
+ {
+  "name": "San Lupo",
+  "country": "Italy",
+  "capacity_mw": 48,
+  "turbines": 16,
+  "relationship": "Developed and operates",
+  "status": "operating",
+  "evidence_url": "https://www.nordlb.com/nordlb/press/nord-lb-and-baywa-re-close-financing-for-three-italian-66-mw-wind-farms"
+ },
+ {
+  "name": "Serralonga",
+  "country": "Italy",
+  "capacity_mw": 50.5,
+  "turbines": 12,
+  "relationship": "Joint venture, developed",
+  "status": "operating",
+  "evidence_url": "https://www.nordlb.com/nordlb/press/nord-lb-and-baywa-re-close-financing-of-505-mw-italian-wind-farm"
+ },
+ {
+  "name": "Rueda Sur",
+  "country": "Spain",
+  "capacity_mw": 135,
+  "turbines": 24,
+  "relationship": "Co-developed and built",
+  "status": "operating",
+  "evidence_url": "https://www.energias-renovables.com/panorama/baywa-r-e-starts-construction-of-188-20240314"
+ },
+ {
+  "name": "Wathegar 2",
+  "country": "United Kingdom",
+  "capacity_mw": 18.45,
+  "turbines": 9,
+  "relationship": "Developed and sold",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.co.uk/en/local-projects/commissioned-projects/wathegar-2"
+ },
+ {
+  "name": "Reichenbach",
+  "country": "Germany",
+  "capacity_mw": 18.6,
+  "turbines": 3,
+  "relationship": "Built and sold",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.de/en/news/baywa-r-e-sells-three-german-wind-projects-with-a-capacity-of-56-mw"
+ },
+ {
+  "name": "Jembke",
+  "country": "Germany",
+  "capacity_mw": 15.3,
+  "turbines": 3,
+  "relationship": "Built and sold",
+  "status": "operating",
+  "evidence_url": "https://www.baywa-re.de/en/news/baywa-r-e-sells-three-german-wind-projects-with-a-capacity-of-56-mw"
+ },
+ {
+  "name": "High Constellation Wind Farm",
+  "country": "United Kingdom",
+  "capacity_mw": 50,
+  "turbines": 10,
+  "relationship": "Owner, pre-construction",
+  "status": "development",
+  "evidence_url": "https://www.baywa-re.com/en/news/baywa-re-acquires-high-constellation-wind-farm-in-the-uk"
+ },
+ {
+  "name": "Karhakkamaa",
+  "country": "Finland",
+  "capacity_mw": 350,
+  "turbines": 48,
+  "relationship": "Co-developing",
+  "status": "development",
+  "evidence_url": "https://nordic.baywa-re.com/sv/news/baywa-r-e-enters-finnish-wind-market"
+ },
+ {
+  "name": "Hevosselkä",
+  "country": "Finland",
+  "capacity_mw": 44,
+  "turbines": 6,
+  "relationship": "Developing",
+  "status": "development",
+  "evidence_url": "https://nordic.baywa-re.com/en/news/building-permit-for-wind-project-in-tervola-enters-into-legal-force"
+ }
+]
