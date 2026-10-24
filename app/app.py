@@ -274,18 +274,13 @@ with tabs[2]:
                  hide_index=True, width="stretch")
     st.markdown("**Validation on 84 simulated outages (July–August)**")
     st.caption("How the method was chosen: every 3-day window in July/August was hidden and rebuilt, using only the 30 days before it.")
-    st.dataframe(pd.DataFrame([
-        {"setup": "Simple baseline", "what it does": "Linear regression (ridge) on the current wind speed of all 7 reference turbines; "
-         "wind put straight through the power curve.", "power RMSE (kW)": 677, "wind RMSE (m/s)": 1.19, "total energy deviation": "−13.7 %"},
-        {"setup": "This tool, without energy correction", "what it does": "Top-5 references picked by correlation. Inputs: their wind now, "
-         "each park's wind 10/30/60 min earlier and later, wind direction, turbulence, how much references agree. "
-         "Prediction = 60 % linear model + 40 % LightGBM (small decision trees). Wind put straight through the power curve.",
-         "power RMSE (kW)": 631, "wind RMSE (m/s)": 1.13, "total energy deviation": "−11.2 %"},
-        {"setup": "This tool", "what it does": "Same wind prediction, but the power curve is averaged over the typical wobble of real "
-         "wind around the estimate (about ±1.1 m/s), which removes the systematic under-estimate of energy.",
-         "power RMSE (kW)": 621, "wind RMSE (m/s)": 1.13, "total energy deviation": "−2.0 %"}]),
-        hide_index=True, width="stretch",
-        column_config={"what it does": st.column_config.TextColumn(width="large")})
+    st.markdown("""
+| setup | what it does | power RMSE | wind RMSE | total energy deviation |
+|---|---|---|---|---|
+| **Simple baseline** | Linear regression (ridge) on the current wind speed of all 7 reference turbines. Wind put straight through the power curve. | 677 kW | 1.19 m/s | −13.7 % |
+| **This tool, without energy correction** | Top-5 references picked by correlation. Inputs: their wind now, each park's wind 10/30/60 min earlier and later, wind direction, turbulence, how much the references agree. Prediction = 60 % linear model + 40 % LightGBM (many small decision trees). Wind put straight through the power curve. | 631 kW | 1.13 m/s | −11.2 % |
+| **This tool** | Same wind prediction, but the power curve is averaged over the typical wobble of real wind around the estimate (about ±1.1 m/s). This removes the systematic under-estimate of energy. | 621 kW | 1.13 m/s | −2.0 % |
+""")
     st.caption("Wind RMSE is the same in the last two rows because only the step from wind to energy differs.")
 
 # ---------------- method ----------------
