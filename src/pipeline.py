@@ -38,14 +38,18 @@ class BlendModel:
         F = build_all(wide, self.refs, **cfg["build"])
         return F[select(F, set(cfg["groups"]))].to_numpy()
 
-    def fit(self, wide: pd.DataFrame, tr: np.ndarray):
+    def fit(self, wide: pd.DataFrame, tr: np.ndarray, sample_weight: np.ndarray | None = None):
+        """sample_weight: optional weight per row of the full index (e.g. to stress steep power-curve bands)."""
         y = wide[("wind_speed", self.target)].to_numpy()
         tr = tr[~np.isnan(y[tr])]
         if not self.refs:
             self.refs = pick_references(wide, self.target, tr)
         self.Xr, self.Xl = self._X(wide, "ridge"), self._X(wide, "lgbm")
-        self.ridge = make_model("ridge", {"alpha": RECIPE["linear"]["alpha"]}).fit(self.Xr[tr], y[tr])
-        self.lgbm = make_model("lgbm", RECIPE["lgbm"]["params"]).fit(self.Xl[tr], y[tr])
+        sw = None if sample_weight is None else sample_weight[tr]
+        rkw = {} if sw is None else {"ridge__sample_weight": sw}
+        lkw = {} if sw is None else {"sample_weight": sw}
+        self.ridge = make_model("ridge", {"alpha": RECIPE["linear"]["alpha"]}).fit(self.Xr[tr], y[tr], **rkw)
+        self.lgbm = make_model("lgbm", RECIPE["lgbm"]["params"]).fit(self.Xl[tr], y[tr], **lkw)
         return self
 
     def predict(self, te: np.ndarray) -> np.ndarray:
@@ -75,7 +79,7 @@ def inner_backtest(wide: pd.DataFrame, target: str, tr: np.ndarray, refs: list[s
     return np.concatenate(preds), np.concatenate(truth), np.concatenate(order)
 
 
-def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days: int = 30, level: str = "90") -> dict:
+def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days: int = 30, level: str = "90", air_density: bool = False) -> dict:
     """Everything the app needs for one target and one outage period."""
     from core import training_mask
     from energy import Wobble, energy_kwh, expected_power
@@ -90,11 +94,21 @@ def estimate_outage(wide: pd.DataFrame, target: str, outage: tuple, window_days:
     ip, it, io = inner_backtest(wide, target, tr, model.refs)
     wob = Wobble().fit(ip, it, io)
     pc = PowerCurve(target)
-    power = expected_power(pc, pred, wob, "gauss_global")
+    rho = None
+    if air_density:
+        from density import estimate_density, wind_factor
+
+        all_refs = [r for r in wide["wind_speed"].columns if r[0] != target[0]]
+        rho = estimate_density(wide, target, all_refs, tr, te)
+        f = wind_factor(rho)
+        wob.global_sd = wob.global_sd * float(f.mean())
+        power = expected_power(pc, pred * f, wob, "gauss_global")
+    else:
+        power = expected_power(pc, pred, wob, "gauss_global")
     e = energy_kwh(power)
     rel = RECIPE["energy"]["range_turbine_rel"][level]
     return {
         "target": target, "refs": model.refs, "timestamps": idx[te], "wind_pred": pred,
-        "power_kw": power, "wobble_sd": wob.global_sd,
+        "power_kw": power, "wobble_sd": wob.global_sd, "air_density": rho,
         "energy_kwh": e, "range_kwh": (e * (1 - rel), e * (1 + rel)), "range_level": level,
     }
