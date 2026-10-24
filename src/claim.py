@@ -193,46 +193,39 @@ def claim_email(results, outage, contract: Contract, calc: dict, level: str, par
                 sender: str, no_exclusion: bool, refs: list[str], window_days: int) -> str:
     pre = contract.preamble
     policy = pre.get("policy", "[policy number]")
-    to = insurer_name or pre.get("insurer", "Claims department")
     s, e = outage[0], outage[1] + pd.Timedelta(minutes=10)
-    c = lambda k: (f" ({cite(contract, k)})" if cite(contract, k) else "")  # noqa: E731
-    L = [f"Subject: Claim under policy {policy} – interruption event at {park_name}, {s:%d %b %Y} to {outage[1]:%d %b %Y}", "",
-         f"Dear {to},", "",
-         f"under policy {policy} we notify an interruption event and claim indemnity for the lost energy{c('notice_days')}.", "",
-         "1. The event" + c("cover"),
-         f"   Communication with {', '.join(r['target'] for r in results)} was lost from {s:%d %B %Y, %H:%M} to {e:%d %B %Y, %H:%M} "
-         f"({calc['outage_hours']:.0f} hours), so no electricity from these turbines reached the grid. This is an interruption event "
-         f"covered by the policy.", "",
-         "2. Lost energy" + c("method"),
-         f"   As the turbines' own measurements are unavailable, the lost energy was determined from wind measurements of the reference "
-         f"turbines {', '.join(refs)} in neighbouring wind parks, applied to the certified power curves of the insured turbines, "
-         f"as the policy requires.",
-         f"   Lost energy: {calc['total_kwh']:,.0f} kWh"]
-    for r in results:
-        L.append(f"     • {r['target']}: {r['energy_kwh']:,.0f} kWh")
-    L += ["", "3. Waiting period" + c("waiting_h"),
-          f"   The first {calc['waiting_h']:g} hours are not indemnified: {calc['waiting_kwh']:,.0f} kWh deducted.",
-          f"   Claimable energy: {calc['claimable_kwh']:,.0f} kWh ({level} % range {calc['claimable_lo']:,.0f} – {calc['claimable_hi']:,.0f} kWh).", ""]
+
+    def cl(*keys):
+        nums = [contract.terms[k].clause for k in keys if k in contract.terms and contract.terms[k].clause]
+        return f" (clause {', '.join(nums)})" if len(nums) == 1 else (f" (clauses {', '.join(nums)})" if nums else "")
+
+    tg = ", ".join(r["target"] for r in results)
+    L = [f"Subject: Claim under policy {policy} – business interruption at {park_name}, {s:%d %b} – {outage[1]:%d %b %Y}", "",
+         "Dear Claims Team,", "",
+         f"Please find attached our claim for business interruption at {park_name} under policy {policy}. "
+         f"It is based on the InSite Claim analysis of the outage.", "",
+         "SUMMARY",
+         f"• Event{cl('cover')}: communication loss, {tg} offline, {s:%d %b %Y %H:%M} – {e:%d %b %Y %H:%M} ({calc['outage_hours']:.0f} h)",
+         f"• Lost energy{cl('method')}: {calc['total_kwh']:,.0f} kWh, rebuilt from reference turbines {', '.join(refs)} with the certified power curves",
+         f"• Waiting period{cl('waiting_h')}: first {calc['waiting_h']:g} h excluded, −{calc['waiting_kwh']:,.0f} kWh",
+         f"• Claimable energy: {calc['claimable_kwh']:,.0f} kWh ({level} % range {calc['claimable_lo']:,.0f} – {calc['claimable_hi']:,.0f} kWh)"]
     if calc.get("rate"):
-        L += ["4. Claimed amount" + c("rate_eur_kwh"),
-              f"   {calc['claimable_kwh']:,.0f} kWh × EUR {calc['rate']:.4f} per kWh = EUR {calc['claimable_kwh'] * calc['rate']:,.2f}."]
-        if calc.get("cap"):
-            L.append(f"   {'Capped at' if calc.get('capped') else 'Within'} the limit of EUR {calc['cap']:,.0f} per event{c('cap_eur')}.")
-        L += [f"   We claim EUR {calc['amount']:,.2f}.", ""]
-    L += ["5. Evidence" + (f" ({', '.join(x for x in [cite(contract, 'validation'), cite(contract, 'resolution'), cite(contract, 'contents')] if x)})"
-                           if any(cite(contract, k) for k in ['validation', 'resolution', 'contents']) else ""),
-          f"   • Claim report: method, uncertainty and validation on 84 simulated 3-day outages and on measured data after the event.",
-          f"   • Wind speed and power time series at 10-minute resolution for every affected turbine ({sum(len(r['timestamps']) for r in results):,} rows).",
-          f"   • The model was trained only on the {window_days} days before the event.", ""]
+        lim = (f", {'capped at' if calc.get('capped') else 'within'} the EUR {calc['cap']:,.0f} limit" if calc.get("cap") else "")
+        L.append(f"• Claimed amount{cl('rate_eur_kwh', 'cap_eur')}: {calc['claimable_kwh']:,.0f} kWh × EUR {calc['rate']:.4f} = "
+                 f"EUR {calc['amount']:,.2f}{lim}")
+    L += ["", f"EVIDENCE{cl('validation', 'resolution', 'contents')}",
+          "• InSite_Claim_Report.pdf – method, uncertainty and validation (84 simulated outages, measured data after the event)",
+          "• Supporting_Evidence.zip – 10-minute measurements, rebuilt wind and power series, power curves",
+          "• Claim_Calculation.csv – every step from lost energy to the claimed amount",
+          "• The insurance policy", ""]
     if no_exclusion:
-        L += ["6. Exclusions" + c("exclusions"),
-              "   We confirm that there was no planned maintenance and no curtailment ordered by the grid operator during the event.", ""]
+        L += [f"We confirm there was no planned maintenance and no curtailment ordered by the grid operator during the event{cl('exclusions')}.", ""]
     nxt = []
     if calc.get("notify_by"):
-        nxt.append(f"This notification is made within the {calc['notice_days']:.0f}-day period{c('notice_days')}, before {calc['notify_by']:%d %B %Y}.")
+        nxt.append(f"This notification is made within the {calc['notice_days']:.0f}-day period{cl('notice_days')}.")
     if calc.get("payment_days"):
-        nxt.append(f"We look forward to payment within {calc['payment_days']:.0f} days of receipt of the complete documentation{c('payment_days')}.")
-    L += nxt + ["", "Kind regards,", sender or "[Name]"]
+        nxt.append(f"We look forward to payment within {calc['payment_days']:.0f} days of receipt of the complete documentation{cl('payment_days')}.")
+    L += [" ".join(nxt), "", "Kind regards,", sender or "[Name]"]
     return "\n".join(L)
 
 

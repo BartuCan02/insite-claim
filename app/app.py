@@ -151,7 +151,9 @@ CSS2 = """
 .trail .dot { flex:0 0 26px; height:26px; border-radius:50%; background:#e9f6ec; color:#248a3d; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
 .trail .tx { flex:1; } .trail .tx b { display:block; font-size:15px; font-weight:600; color:#1d1d1f; } .trail .tx span { font-size:13px; color:#6e6e73; line-height:1.5; }
 .trail .tag { font-size:12px; font-weight:600; color:#248a3d; background:#e9f6ec; border-radius:980px; padding:3px 10px; white-space:nowrap; }
-.atth { font-size:13px; font-weight:600; color:#6e6e73; margin:14px 0 6px; }
+.atth { font-size:13px; font-weight:600; color:#1d1d1f; margin:16px 0 8px; } .atth span { font-weight:400; color:#86868b; margin-left:8px; }
+.mlab { font-size:13px; color:#6e6e73; font-weight:500; }
+.st-key-mail_to input { background:#e8f2fd !important; color:#0071e3 !important; font-weight:500; }
 div[class*="st-key-att_row_"] { background:#fafafc; border:1px solid #e8e8ed; border-radius:12px; padding:4px 10px; margin-bottom:6px; }
 div[class*="st-key-att_row_"] [data-testid="stHorizontalBlock"] { gap:8px; }
 div[class*="st-key-att_row_"] button { min-height:30px !important; padding:0 8px !important; color:#6e6e73 !important; font-size:18px !important; }
@@ -195,7 +197,7 @@ div[class*="st-key-att_row_"] button { min-height:30px !important; padding:0 8px
 .st-key-pz_float { left:0; right:0; margin:0 auto; top:76px; width:min(780px, 92vw) !important; max-height:calc(100vh - 160px); overflow-y:auto;
   background:rgba(255,255,255,.80); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%);
   border:1px solid rgba(255,255,255,.7); border-radius:28px; padding:28px 30px !important; box-shadow:0 40px 100px rgba(16,24,40,.22); animation: pzin .45s ease both; }
-.st-key-pz_float.wide, .st-key-pz_tech { width:min(1060px, 94vw) !important; }
+.st-key-pz_tech { position:fixed !important; z-index:1000; left:0; right:0; margin:0 auto; top:66px; width:min(1180px, 95vw) !important; max-height:calc(100vh - 140px); overflow-y:auto; background:rgba(255,255,255,.86); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%); border:1px solid rgba(255,255,255,.7); border-radius:28px; padding:26px 30px !important; box-shadow:0 40px 100px rgba(16,24,40,.22); }
 div[class*="st-key-pz_r"] { background:#fff; border-radius:18px; padding:14px 18px; box-shadow:0 1px 2px rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.05); }
 .pzic { width:44px; height:44px; border-radius:50%; background:#f2f2f4; display:flex; align-items:center; justify-content:center; }
 .pzrl { font-size:12px; color:#6e6e73; font-weight:500; margin-bottom:2px; }
@@ -574,7 +576,7 @@ def kpi_cards():
     if calc and calc.get("rate"):
         exposure = calc["total_kwh"] * calc["rate"]
         cards.append(("Claim estimate", f"EUR {calc['amount']:,.0f}",
-                      f"of EUR {exposure:,.0f} lost revenue · after the {calc['waiting_h']:g} h waiting period · subject to coverage review", kicon(IC_COIN)))
+                      f"range EUR {calc['amount_lo']:,.0f} – {calc['amount_hi']:,.0f} · after the {calc['waiting_h']:g} h waiting period · subject to review", kicon(IC_COIN)))
     else:
         cards.append(("Claim estimate", "—", "Add the insurance contract on the Claim report page", kicon(IC_COIN)))
     tm = [r["test_metrics"] for r in results if "test_metrics" in r]
@@ -587,8 +589,9 @@ def kpi_cards():
     else:
         mae = float(np.mean([r["inner_metrics"]["wind_mae"] for r in results]))
         cards.append(("Back-tested accuracy", f"{mae:.2f}<span>m/s</span>", "wind MAE on the training days, each piece hidden in turn", kicon(IC_SHIELD)))
-    cards.append(("Outage duration", f"{CTX['hours']:.0f}<span>h</span>",
-                  f"{CTX['start']:%d %b %H:%M} → {CTX['end'] + pd.Timedelta(minutes=10):%d %b %H:%M}", kicon(IC_CLOCK)))
+    rel = (RECIPE["energy"]["range_park_rel"] if len(results) > 1 else RECIPE["energy"]["range_turbine_rel"])[lv]
+    cards.insert(1, ("Uncertainty", f"±{100 * rel:.0f}<span>%</span>",
+                     f"{lv} % range {CTX['lo']:,.0f} – {CTX['hi']:,.0f} kWh · calibrated on 84 simulated outages", kicon(IC_CLOCK)))
     with st.container(key="kpiwrap"):
         kpis(cards)
 
@@ -1196,12 +1199,21 @@ def composer_card(contract, calc, no_excl, cfp):
         t1.markdown("<div class='ctitle' style='font-size:22px'>Prepare Insurance Claim</div>"
                     "<div class='csub'>Review and edit. InSite Claim never sends email itself.</div>", unsafe_allow_html=True)
         t2.markdown(f"<div style='text-align:right'>{badge('Draft', 'blue')}</div>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        to = c1.text_input("To", placeholder="claims@your-insurer.example", key="mail_to")
-        cc = c2.text_input("Cc", placeholder="Optional", key="mail_cc")
-        subj = st.text_input("Subject", value=subject, key=f"mail_subj_{h}")
-        msg = st.text_area("Message", value=body, height=330, key=f"mail_body_{h}")
-        st.markdown(f"<div class='atth'>Attachments ({len(atts)})</div>", unsafe_allow_html=True)
+        def lab(col, t):
+            col.markdown(f"<div class='mlab'>{t}</div>", unsafe_allow_html=True)
+        l1, f1 = st.columns([0.12, 1], vertical_alignment="center")
+        lab(l1, "To")
+        to = f1.text_input("To", placeholder="claims@your-insurer.example", key="mail_to", label_visibility="collapsed")
+        l2, f2 = st.columns([0.12, 1], vertical_alignment="center")
+        lab(l2, "Cc")
+        cc = f2.text_input("Cc", placeholder="Optional", key="mail_cc", label_visibility="collapsed")
+        l3, f3 = st.columns([0.12, 1], vertical_alignment="center")
+        lab(l3, "Subject")
+        subj = f3.text_input("Subject", value=subject, key=f"mail_subj_{h}", label_visibility="collapsed")
+        st.markdown("<div class='mlab' style='margin-top:6px'>Message</div>", unsafe_allow_html=True)
+        msg = st.text_area("Message", value=body, height=330, key=f"mail_body_{h}", label_visibility="collapsed")
+        st.markdown(f"<div class='atth'>Attachments ({len(atts)}) <span>Auto-generated from the analysis · real files, ready to send</span></div>",
+                    unsafe_allow_html=True)
         for i, (name, data, mime) in enumerate(atts):
             with st.container(key=f"att_row_{i}"):
                 a1, a2, a3, a4, a5 = st.columns([0.45, 7, 1.4, 0.55, 0.55], vertical_alignment="center", gap="small")
@@ -1323,7 +1335,7 @@ def pz_nav(center=False):
     dots = "".join(f"<i class='{'on' if j == k else ''}'></i>" for j in range(subs)) if subs > 1 else ""
     prog = f"<div class='pzprog'>{s_:02d} / 08{('<span>' + dots + '</span>') if dots else ''}</div>"
     with st.container(key="pz_uic" if center else "pz_ui", horizontal=True, gap="small"):
-        if not center and (s_ > 1 or k > 0):
+        if s_ > 1 or k > 0:
             st.button("← Back", key="pz_back", type="tertiary", on_click=pres_back)
         st.markdown(prog, unsafe_allow_html=True)
         if s_ == 8:
@@ -1405,8 +1417,8 @@ def stage_cinema(n):
         sil = silhouettes("#11161d", "#11161d", .3)
         cls = "pz1"
     else:
-        body = ("<h1>Calculate it. Prove it. <b>Claim it.</b></h1>"
-                "<p>InSite Claim — from missing data to defensible claims.</p>")
+        body = ("<h1 style='font-size:60px;max-width:1100px'>When turbines stop, the wind data disappears.<br><b>How do you prove the loss?</b></h1>"
+                "<p style='font-size:26px;font-weight:500'>No wind data. No proof. No claim.</p>")
         sil = silhouettes("#3d4652", "#3d4652", .35)
         cls = "pz2"
     with st.container(key="pz_cine"):
@@ -1520,18 +1532,48 @@ def stage_tech():
             ("Hour of day", 1, ORANGE), ("Air pressure", 2, ORANGE), ("Temperature", 5, ORANGE)]
     rows = "".join(f"<div class='pzbar'><div>{esc(n)}</div><div class='tr'><div class='fl' style='width:{abs(v) / 17 * 100:.0f}%;background:{c}'></div></div>"
                    f"<div class='vv'>{v:+d} kW</div></div>" for n, v, c in bars)
-    steps = [("5 reference turbines", "other parks, ranked by correlation over the training days"),
-             ("Wind in time", "now, ±10–60 min" + (", plus a travel time learned per wind direction" if TRAVEL else "")),
-             (f"{W_LIN} % linear + {W_LGBM} % trees", "ridge regression and LightGBM, trained on the 30 days before the outage"),
-             ("Power curve over the wobble", "averages over the real spread of wind, fixing a 10 % under-count")]
-    st_html = "".join(f"<div class='pzstep'><div class='n'>{i}</div><div><b>{esc(a)}</b><span>{esc(b)}</span></div></div>" for i, (a, b) in enumerate(steps, 1))
-    with st.container(key="pz_float"):
-        st.markdown("<div class='pzh'>How the wind is rebuilt — and how we chose it</div>"
-                    "<div class='pzs'>Staged grid search: 65,000+ models, each tested on 84 simulated 3-day outages.</div>"
-                    f"<div class='pztech'><div class='col'><h3>The model</h3>{st_html}</div>"
+    search = [("References", "127 subsets of 7 turbines", "top 5 by correlation"), ("Features", "all 256 combinations of 8 groups", "time, direction, rolling, turbulence"),
+              ("Time shifts", "12 settings × 3 windows", "±10, 30, 60 min + travel time"), ("Model settings", "61 configurations", "small trees, strong penalty"),
+              ("Blend", "11 weights", f"{W_LIN} % linear, {W_LGBM} % trees")]
+    srows = "".join(f"<tr><td><b>{esc(a_)}</b></td><td>{esc(b_)}</td><td>{esc(c_)}</td></tr>" for a_, b_, c_ in search)
+    io_ = [("Input", "Reference turbines in other parks", "10-min wind speed, direction, turbulence · 30 days before the outage + the outage itself"),
+           ("Model", f"{W_LIN} % ridge + {W_LGBM} % LightGBM", "features: wind now, ±10/30/60 min, travel time per direction, rolling means, agreement"),
+           ("Output", "Wind speed of each affected turbine", "every 10 min → power curve averaged over the wobble → kWh ± range")]
+    io_html = "<div class='arr'>›</div>".join(f"<div class='st'><div class='l'>{esc(a_)}</div><div class='v' style='font-size:17px'>{esc(b_)}</div>"
+                                             f"<div class='c'>{esc(c_)}</div></div>" for a_, b_, c_ in io_)
+    with st.container(key="pz_tech"):
+        st.markdown("<div class='pzh'>How the wind is rebuilt — and how we found the model</div>"
+                    f"<div class='flow' style='grid-template-columns:1fr 22px 1fr 22px 1fr'>{io_html}</div>"
+                    "<div class='pztech' style='margin-top:14px'>"
+                    "<div class='col'><h3>How we found it: staged grid search</h3><table class='t'><thead><tr><th>Stage</th><th>Tried</th><th>Won</th></tr></thead>"
+                    f"<tbody>{srows}</tbody></table><div class='pzsmall'>65,000+ trained models, each scored on 84 simulated 3-day outages. "
+                    "The 4–9 Sep test window stayed locked until the end.</div></div>"
                     f"<div class='col'><h3>What mattered</h3>{rows}<div class='pzsmall'>Change in power error when a feature group is added. "
                     "Wind travels between parks and the link depends on direction. Temperature hurt, so it is used for air density instead.</div></div></div>",
                     unsafe_allow_html=True)
+        res = CTX["results"]
+        tgts = [x["target"] for x in res]
+        refs_all = [t for t in CTX["turbines"] if park_of(t) not in {park_of(x) for x in tgts}]
+        C = CTX["wide"]["wind_speed"].iloc[res[0]["train_idx"]][tgts + refs_all].corr().loc[tgts, refs_all]
+        st.markdown("<div class='ctitle' style='margin-top:16px'>Affected turbines against reference turbines</div>"
+                    "<div class='csub'>Correlation over the training days. The higher, the better the reference — O1 and O2 lead for every turbine.</div>",
+                    unsafe_allow_html=True)
+        f = go.Figure(go.Heatmap(z=C.values, x=list(C.columns), y=list(C.index), zmin=0.5, zmax=0.85, text=C.round(2).values, texttemplate="%{text}",
+                                 colorscale=[[0, "#f5f5f7"], [0.5, "#9ec9f5"], [1, BLUE]], showscale=False, xgap=3, ygap=3, hoverinfo="skip"))
+        f.update_yaxes(autorange="reversed", showgrid=False)
+        chart(style(f, 60 + 56 * len(tgts), legend=False), key="pz_heat")
+
+
+def stage_bonus():
+    items = [("Insurance report", "Contract clauses read automatically, claim amount calculated, email drafted with clause references, "
+              "PDF report and evidence ZIP generated."),
+             ("Additional parameters", "Wind direction, turbulence and air pressure feed the model. Temperature and pressure drive an optional "
+              "air-density correction (IEC 61400-12)."),
+             ("Automatic turbine selection", "Every turbine in other parks is ranked by correlation; the best five are picked for each affected turbine.")]
+    with st.container(key="pz_float"):
+        st.markdown("<div class='pzh'>Bonus challenges</div><div class='pzs'>All three are part of the product.</div>"
+                    + "".join(f"<div class='pzstep'><div class='n' style='background:#e9f6ec;color:#248a3d'>✓</div><div><b>{esc(a_)}</b>"
+                              f"<span>{esc(b_)}</span></div></div>" for a_, b_ in items), unsafe_allow_html=True)
 
 
 def page_present():
@@ -1574,8 +1616,8 @@ def page_present():
         pz_caption(cap)
         page_analysis(present=True)
     else:
-        if s_ == 7 and k == 0:
-            target, cap = "card_evidence", "Every result is backed by <b>traceable evidence.</b>"
+        if s_ == 7 and k == 1:
+            target, cap = None, "Bonus challenges · <b>all three built in</b>"
         elif s_ == 7:
             contract, _, _ = contract_and_calc()
             n = sum(1 for t in contract.terms.values() if t.clause) if contract else 0
@@ -1584,6 +1626,8 @@ def page_present():
         else:
             target, cap = "card_composer", "From missing data to <b>a defensible claim.</b>"
         spotlight(target)
+        if s_ == 7 and k == 1:
+            stage_bonus()
         pz_caption(cap)
         page_report()
     pz_nav()
