@@ -54,6 +54,11 @@ def _kwh(x: float) -> str:
     return f"{x:,.0f}"
 
 
+def _rate(x: float) -> str:
+    """At least 4 decimals, more when the rate has them, so 'kWh x rate = amount' adds up on paper."""
+    return f"{x:.4f}" if round(x, 4) == x else f"{x:g}"
+
+
 def _when(t: pd.Timestamp) -> str:
     return f"{t:%d %b %Y, %H:%M}"
 
@@ -107,6 +112,15 @@ def _fit(pdf: FPDF, text: str, width: float, size: float, style: str = "B", smal
     return size
 
 
+def _clip(pdf: FPDF, text: str, width: float) -> str:
+    """Shorten text with '...' so it fits width in the current font (cell() does not clip)."""
+    if pdf.get_string_width(text) <= width:
+        return text
+    while text and pdf.get_string_width(text.rstrip(" ,") + "...") > width:
+        text = text[:-1]
+    return text.rstrip(" ,") + "..."
+
+
 def _logo(pdf: FPDF, x: float, y: float, h: float):
     """The app's turbine mark: dark tower, three blue blades. Drawn in the SVG's -20..20 x -22..24 box."""
     s = h / 46
@@ -151,14 +165,26 @@ def _kpis(pdf: FPDF, items: list[tuple[str, str, str, str]]):
             pdf.cell(unit_w, 9.6, unit)
         if note:
             pdf.set_xy(x + 5, y + 18.5)
-            _fit(pdf, note, w - 10, 7.5, style="", smallest=6)
+            _fit(pdf, note, w - 10, 7.5, style="", smallest=6.5)
             pdf.set_text_color(*TEXT3)
-            pdf.cell(w - 10, 4, note)
+            pdf.cell(w - 10, 4, _clip(pdf, note, w - 10))
     pdf.set_xy(pdf.l_margin, y + h + 2)
+
+
+def _fit_first_col(pdf: FPDF, cells: list[str], widths: list[float], size: float, pad: float) -> list[float]:
+    """Widen the first column (up to 30 % of the table) so names like 'WTG-01-Nordsee' stay on one line."""
+    pdf.set_font(FONT, "B", size)
+    total = sum(widths)
+    need = min((max((pdf.get_string_width(c) for c in cells), default=0) + 2 * pad + 0.5) / pdf.epw, 0.3) * total
+    if need <= widths[0]:
+        return widths
+    rest = total - widths[0]
+    return [need] + [w - (need - widths[0]) * w / rest for w in widths[1:]]
 
 
 def _table(pdf: FPDF, header: list[str], rows: list[list[str]], widths: list[float], align: list[str],
            bold_last: bool = False, size: float = 9):
+    widths = _fit_first_col(pdf, [r[0] for r in rows], widths, size, pad=1.6)
     pdf.set_font(FONT, "", size)
     pdf.set_text_color(*INK)
     pdf.set_draw_color(*LINE)
@@ -196,6 +222,13 @@ def _png(draw, w_mm: float, h_mm: float) -> io.BytesIO:
     return buf
 
 
+def _legend_cols(names: list[str], width_mm: float = 160, font_pt: float = 7.5) -> int:
+    """Legend columns that fit the chart width: handle + gap + text (about 0.6 em per character)."""
+    em = font_pt * 25.4 / 72
+    entry = (1.6 + 0.8 + 2.0 + 0.6 * max((len(n) for n in names), default=1)) * em
+    return max(1, min(len(names), int(width_mm // entry)))
+
+
 def _wind_chart(results) -> io.BytesIO:
     def draw(ax):
         for i, r in enumerate(results):
@@ -208,7 +241,8 @@ def _wind_chart(results) -> io.BytesIO:
         ax.xaxis.set_major_locator(mdates.DayLocator())
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
         ax.margins(x=0.01)
-        ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=len(results), handlelength=1.6, fontsize=7.5,
+        ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=_legend_cols([r["target"] for r in results]),
+                  handlelength=1.6, fontsize=7.5,
                   labelcolor="#1d1d1f", borderaxespad=0.2)
 
     return _png(draw, 174, 66)
@@ -270,9 +304,9 @@ def _contract_rows(contract, calc: dict, results, level: str) -> list[list[str]]
     rate = val("rate")
     rate = rate if rate is not None else val("rate_eur_kwh")
     if rate:
-        applied = (f"{_kwh(calc['claimable_kwh'])} kWh x EUR {rate:.4f} = EUR {calc['claimable_kwh'] * rate:,.2f}"
+        applied = (f"{_kwh(calc['claimable_kwh'])} kWh x EUR {_rate(rate)} = EUR {calc['claimable_kwh'] * rate:,.2f}"
                    if "claimable_kwh" in calc else "-")
-        row("rate_eur_kwh", f"EUR {rate:.4f} per kWh", applied)
+        row("rate_eur_kwh", f"EUR {_rate(rate)} per kWh", applied)
     cap = val("cap")
     cap = cap if cap is not None else val("cap_eur")
     if cap:

@@ -203,7 +203,8 @@ div[class*="st-key-pz_r"] { background:#fff; border-radius:18px; padding:14px 18
 .pzs { font-size:15px; color:#6e6e73; margin-bottom:16px; }
 .st-key-pz_analyze button { background:linear-gradient(180deg,#2d95ff,#0071e3) !important; border:none !important; min-height:54px !important; font-size:18px !important; box-shadow:0 10px 26px rgba(0,113,227,.35) !important; }
 .st-key-pz_analyze button p { font-size:18px !important; font-weight:600 !important; }
-.st-key-pz_load { inset:0; display:flex; align-items:center; justify-content:center; background:rgba(245,245,247,.35); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.st-key-pz_load { inset:0; width:100vw !important; height:100vh !important; display:flex !important; align-items:center !important; justify-content:center !important; background:rgba(245,245,247,.35); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.st-key-pz_load [data-testid='stElementContainer'] { width:auto !important; }
 .pzl { width:340px; background:#fff; border-radius:28px; padding:36px 28px 30px; text-align:center; box-shadow:0 40px 100px rgba(16,24,40,.22); animation: pzin .4s ease both; }
 .pzring { position:relative; width:132px; height:132px; margin:0 auto 18px; }
 .pzring svg { transform:rotate(-90deg); }
@@ -1375,7 +1376,7 @@ def pz_scroll(target):
   const sel = {json.dumps('.st-key-' + target) if target else 'null'};
   if (!sel) {{ window.scrollTo({{top: 0, behavior: 'smooth'}}); return; }}
   let n = 0;
-  const go = () => {{ const el = document.querySelector(sel); if (el) {{ el.scrollIntoView({{behavior: 'smooth', block: 'center'}}); }} else if (n++ < 50) setTimeout(go, 100); }};
+  const go = () => {{ const el = document.querySelector(sel); if (el) {{ const r = el.getBoundingClientRect(); const tall = r.height > window.innerHeight * 0.78; const y = window.scrollY + r.top - (tall ? 84 : (window.innerHeight - r.height) / 2); window.scrollTo({{top: Math.max(0, y), behavior: 'smooth'}}); }} else if (n++ < 50) setTimeout(go, 100); }};
   setTimeout(go, 250);
 }})();
 </script>""", unsafe_allow_javascript=True)
