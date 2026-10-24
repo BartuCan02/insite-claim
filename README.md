@@ -55,6 +55,17 @@ Switch **Data source** on the Overview page to **Upload files**:
 
 Ready-made CSV copies of the hackathon data are in `data/example_csv/`.
 
+
+### Presentation mode
+
+Click **Present** (top right) for the 3-minute guided pitch: seven stages from the opening question to the finished
+insurance email, each spotlighting a real part of the app. **→** / **Next** moves on, **←** / **Back** goes back,
+**Esc** exits, **Full screen** fills the display. Open the app once beforehand so the first analysis is cached.
+
+The claim email (Claim report page and the last stage) comes with real, auto-generated attachments: a PDF claim report,
+the insurance contract, a ZIP of supporting evidence and the claim calculation (CSV). **Prepare claim email →** downloads
+an `.eml` draft that opens in Mail or Outlook with all attachments; nothing is sent by the app.
+
 ## How it works
 
 1. **Find the outage** from the missing data (longest gap shared by a park, adjustable).
