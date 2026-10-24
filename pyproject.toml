@@ -13,3 +13,8 @@ dependencies = [
     "pyarrow>=26.0.0",
     "scikit-learn>=1.9.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
