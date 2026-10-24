@@ -35,7 +35,7 @@ def filled_ws(wide: pd.DataFrame, refs: list[str]) -> pd.DataFrame:
     return ws.apply(lambda c: c.fillna(fleet * means[c.name]))
 
 
-def build_all(wide: pd.DataFrame, refs: list[str], shifts=DEFAULT_SHIFTS, rolls=DEFAULT_ROLLS, shift_level="park") -> pd.DataFrame:
+def build_all(wide: pd.DataFrame, refs: list[str], shifts=DEFAULT_SHIFTS, rolls=DEFAULT_ROLLS, shift_level="park", directions=("m", "p")) -> pd.DataFrame:
     parks = sorted({park_of(r) for r in refs})
     members = {p: [r for r in refs if park_of(r) == p] for p in parks}
     ws = filled_ws(wide, refs)
@@ -48,8 +48,10 @@ def build_all(wide: pd.DataFrame, refs: list[str], shifts=DEFAULT_SHIFTS, rolls=
     src = park_ws if shift_level == "park" else ws
     for name in src.columns:
         for k in shifts:
-            out[f"shift__{name}__m{k}"] = src[name].shift(k)  # value k steps earlier
-            out[f"shift__{name}__p{k}"] = src[name].shift(-k)  # value k steps later
+            if "m" in directions:
+                out[f"shift__{name}__m{k}"] = src[name].shift(k)  # value k steps earlier
+            if "p" in directions:
+                out[f"shift__{name}__p{k}"] = src[name].shift(-k)  # value k steps later
 
     for p in parks:
         for w in rolls:
