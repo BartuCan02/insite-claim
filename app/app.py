@@ -1524,11 +1524,11 @@ def stage_tech():
     rows = "".join(f"<div class='pzbar'><div>{esc(n)}</div><div class='tr'><div class='fl' style='width:{abs(v) / 17 * 100:.0f}%;background:{c}'></div></div>"
                    f"<div class='vv'>{v:+d} kW</div></div>" for n, v, c in bars)
     search = [("References", "127 subsets of 7 turbines", "top 5 by correlation"), ("Features", "all 256 combinations of 8 groups", "time, direction, rolling, turbulence"),
-              ("Time shifts", "12 settings × 3 windows", "±10, 30, 60 min + travel time"), ("Model settings", "61 configurations", "small trees, strong penalty"),
+              ("Time shifts", "12 settings × 3 windows", "±10, 30, 60 min"), ("Model settings", "61 configurations", "small trees, strong penalty"),
               ("Blend", "11 weights", f"{W_LIN} % linear, {W_LGBM} % trees")]
     srows = "".join(f"<tr><td><b>{esc(a_)}</b></td><td>{esc(b_)}</td><td>{esc(c_)}</td></tr>" for a_, b_, c_ in search)
     io_ = [("Input", "Reference turbines in other parks", "10-min wind speed, direction, turbulence · 30 days before the outage + the outage itself"),
-           ("Model", f"{W_LIN} % ridge + {W_LGBM} % LightGBM", "features: wind now, ±10/30/60 min, travel time per direction, rolling means, agreement"),
+           ("Model", f"{W_LIN} % ridge + {W_LGBM} % LightGBM", "features: wind now, ±10/30/60 min, rolling means, direction, turbulence"),
            ("Output", "Wind speed of each affected turbine", "every 10 min → power curve averaged over the wobble → kWh ± range")]
     io_html = "<div class='arr'>›</div>".join(f"<div class='st'><div class='l'>{esc(a_)}</div><div class='v' style='font-size:17px'>{esc(b_)}</div>"
                                              f"<div class='c'>{esc(c_)}</div></div>" for a_, b_, c_ in io_)
